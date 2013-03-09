@@ -1,14 +1,6 @@
 /* LazySorted objects */
 
-/*
-   You will probably want to delete all references to 'x_attr' and add
-   your own types of attributes instead.  Maybe you want to name your
-   local variables other than 'self'.  If your object type is needed in
-   other files, you'll have to create a file "foobarobject.h"; see
-   intobject.h for an example. */
-
 #include "Python.h"
-#include "listobject.h"
 
 typedef struct {
     PyObject_HEAD
@@ -34,7 +26,61 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
-/* LS methods */
+/* Private helper functions for partial sorting */
+
+/* These MACROs are basically taken from list.c */
+#define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT)
+
+#define IFLT(X, Y) if ((ltflag = ISLT(X, Y)) < 0) goto fail;  \
+            if(ltflag)
+
+/* Note: no semicolon at the end, so that you can include one yourself */
+#define SWAP(i, j) tmp = ob_item[i];  \
+                   ob_item[i] = ob_item[j];  \
+                   ob_item[j] = tmp
+
+/* Picks a pivot point among the indices left <= i < right */
+static Py_ssize_t
+pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+{
+    /* XXX */
+    return left;
+}
+
+/* Partitions the data between left and right and returns the pivot index,
+ * or -1 on error */
+static Py_ssize_t
+partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+{
+    PyObject *tmp;
+    PyObject *pivot;
+    Py_ssize_t ltflag;
+
+    Py_ssize_t pivot_index = pick_pivot(ob_item, left, right);
+    pivot = ob_item[pivot_index];
+
+    SWAP(left, pivot_index);
+    Py_ssize_t last_less = left;
+
+    /* Invariant: last_less and everything to its left is less than
+     * pivot or the pivot itself */
+
+    Py_ssize_t i;
+    for (i = left + 1; i < right; i++) {
+        IFLT(ob_item[i], pivot) {
+            last_less++;
+            SWAP(i, last_less);
+        }
+    }
+
+    SWAP(left, last_less);
+    return last_less;
+
+fail:
+    return -1;
+}
+
+/* LazySorted methods */
 
 static void
 LS_dealloc(LSObject *self)

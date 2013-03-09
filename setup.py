@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 module1 = Extension('lazysorted',
                      sources=['lazysorted.c'],
-                     extra_compile_args=['-O0', '-Werror'])
+                     extra_compile_args=['-O0'])
 
 setup(name = 'lazysorted',
       version = '1.0',
