@@ -105,9 +105,11 @@ fail:
 static PyObject *indexerr = NULL;
 
 static PyObject *
-list_item(LSObject *ls, Py_ssize_t i)
+ls_item(LSObject *ls, Py_ssize_t i)
 {
-    if (i < 0 || i >= Py_SIZE(ls->xs)) {
+    Py_ssize_t xs_len = Py_SIZE(ls->xs);
+
+    if (i < 0 || i >= xs_len) {
         if (indexerr == NULL) {
             indexerr = PyString_FromString(
                 "list index out of range");
@@ -117,8 +119,28 @@ list_item(LSObject *ls, Py_ssize_t i)
         PyErr_SetObject(PyExc_IndexError, indexerr);
         return NULL;
     }
-    Py_INCREF(ls->xs->ob_item[i]);
-    return ls->xs->ob_item[i];
+
+    /* Run quickselect */
+    Py_ssize_t left = 0;
+    Py_ssize_t right = xs_len;
+    Py_ssize_t pivot_index;
+
+    while (left < right) {
+        pivot_index = partition(ls->xs->ob_item, left, right);
+        if (pivot_index < i) {
+            left = pivot_index + 1;
+        }
+        else if (pivot_index > i) {
+            right = pivot_index;
+        }
+        else {
+            left = pivot_index;
+            break;
+        }
+    }
+
+    Py_INCREF(ls->xs->ob_item[left]);
+    return ls->xs->ob_item[left];
 }
 
 static PyObject *
@@ -131,7 +153,7 @@ ls_subscript(LSObject* self, PyObject* item)
             return NULL;
         if (i < 0)
             i += PyList_GET_SIZE(self->xs);
-        return list_item(self, i);
+        return ls_item(self, i);
     }
     /*
     else if (PySlice_Check(item)) {

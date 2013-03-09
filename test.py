@@ -24,7 +24,15 @@ class TestLazySorted(unittest.TestCase):
             for k in xrange(1, n):
                 for rep in xrange(1, 10):
                     random.shuffle(xs)
-                    self.assertEqual(LazySorted(xs)[k], k)
+                    self.assertEqual(LazySorted(xs)[k], k,
+                                     msg="xs = %s; k = %d" % (xs, k))
+
+    def test_len(self):
+        for n in xrange(1024):
+            xs = range(n)
+            ls = LazySorted(xs)
+            self.assertEqual(len(ls), n)
+            self.assertEqual(ls.__len__(), n)
 
 
 if __name__ == "__main__":
