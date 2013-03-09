@@ -1,10 +1,28 @@
 /* LazySorted objects */
 
 #include "Python.h"
+#include <search.h>
+
+/* Definitions for the binary search tree of pivot points */
+typedef struct {
+    Py_ssize_t index;
+    int flags;
+} PivotNode;
+
+int
+compareNodes(const void *pa, const void *pb)
+{
+    if (((PivotNode *)pa)->index < ((PivotNode *)pb)->index)
+        return -1;
+    if (((PivotNode *)pa)->index > ((PivotNode *)pb)->index)
+        return 1;
+    return 0;
+}
 
 typedef struct {
     PyObject_HEAD
-    PyObject            *xs;            /* Partially sorted list */
+    PyListObject        *xs;            /* Partially sorted list */
+    PivotNode           *root;          /* Root of the pivot BST */
 } LSObject;
 
 static PyTypeObject LS_Type;
@@ -19,22 +37,24 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->xs = PyList_Type.tp_new(&PyList_Type, args, kwds);
+    self->xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, args, kwds);
     if (self->xs == NULL)
         return NULL;
+
+    self->root = NULL;
 
     return (PyObject *)self;
 }
 
 /* Private helper functions for partial sorting */
 
-/* These MACROs are basically taken from list.c */
+/* These macros are basically taken from list.c */
 #define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT)
 
 #define IFLT(X, Y) if ((ltflag = ISLT(X, Y)) < 0) goto fail;  \
             if(ltflag)
 
-/* Note: no semicolon at the end, so that you can include one yourself */
+/* N.B: No semicolon at the end, so that you can include one yourself */
 #define SWAP(i, j) tmp = ob_item[i];  \
                    ob_item[i] = ob_item[j];  \
                    ob_item[j] = tmp
@@ -82,10 +102,93 @@ fail:
 
 /* LazySorted methods */
 
+static PyObject *indexerr = NULL;
+
+static PyObject *
+list_item(LSObject *ls, Py_ssize_t i)
+{
+    if (i < 0 || i >= Py_SIZE(ls->xs)) {
+        if (indexerr == NULL) {
+            indexerr = PyString_FromString(
+                "list index out of range");
+            if (indexerr == NULL)
+                return NULL;
+        }
+        PyErr_SetObject(PyExc_IndexError, indexerr);
+        return NULL;
+    }
+    Py_INCREF(ls->xs->ob_item[i]);
+    return ls->xs->ob_item[i];
+}
+
+static PyObject *
+ls_subscript(LSObject* self, PyObject* item)
+{
+    if (PyIndex_Check(item)) {
+        Py_ssize_t i;
+        i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+        if (i == -1 && PyErr_Occurred())
+            return NULL;
+        if (i < 0)
+            i += PyList_GET_SIZE(self->xs);
+        return list_item(self, i);
+    }
+    /*
+    else if (PySlice_Check(item)) {
+        Py_ssize_t start, stop, step, slicelength, cur, i;
+        PyObject* result;
+        PyObject* it;
+        PyObject **src, **dest;
+
+        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self),
+                         &start, &stop, &step, &slicelength) < 0) {
+            return NULL;
+        }
+
+        if (slicelength <= 0) {
+            return PyList_New(0);
+        }
+        else if (step == 1) {
+            return list_slice(self, start, stop);
+        }
+        else {
+            result = PyList_New(slicelength);
+            if (!result) return NULL;
+
+            src = self->ob_item;
+            dest = ((PyListObject *)result)->ob_item;
+            for (cur = start, i = 0; i < slicelength;
+                 cur += step, i++) {
+                it = src[cur];
+                Py_INCREF(it);
+                dest[i] = it;
+            }
+
+            return result;
+        }
+    }
+    */
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "list indices must be integers, not %.200s",
+                     item->ob_type->tp_name);
+        return NULL;
+    }
+}
+
+static Py_ssize_t
+ls_length(LSObject *ls)
+{
+    return Py_SIZE(ls->xs);
+}
+
 static void
 LS_dealloc(LSObject *self)
 {
     Py_DECREF(self->xs);
+    while (tdelete(self->root, (void **)&self->root, compareNodes) != NULL) {
+        /* do nothing */
+    }
     PyObject_Del(self);
 }
 
@@ -97,9 +200,17 @@ LS_xs(LSObject *self)
 }
 
 static PyMethodDef LS_methods[] = {
+    {"__getitem__",     (PyCFunction)ls_subscript, METH_O|METH_COEXIST,
+        PyDoc_STR("__getitem__ ADD Documentation")},
     {"get_xs",          (PyCFunction)LS_xs, METH_NOARGS,
         PyDoc_STR("get_xs() -> List")},
     {NULL,              NULL}           /* sentinel */
+};
+
+static PyMappingMethods ls_as_mapping = {
+    (lenfunc)ls_length,
+    (binaryfunc)ls_subscript,
+    NULL,
 };
 
 static int
@@ -111,7 +222,7 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
     if (!PyArg_ParseTupleAndKeywords(args, kw, "|O:list", kwlist, &arg))
         return -1;
 
-    if (PyList_Type.tp_init(self->xs, args, kw))
+    if (PyList_Type.tp_init((PyObject *)self->xs, args, kw))
         return -1;
 
     return 0;
@@ -133,7 +244,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_repr*/
     0,                      /*tp_as_number*/
     0,                      /*tp_as_sequence*/
-    0,                      /*tp_as_mapping*/
+    &ls_as_mapping,         /*tp_as_mapping*/
     0,                      /*tp_hash*/
     0,                      /*tp_call*/
     0,                      /*tp_str*/
@@ -174,7 +285,7 @@ static PyMethodDef ls_methods[] = {
 PyDoc_STRVAR(module_doc,
 "This is a template module just for instruction.");
 
-/* Initialization function for the module (*must* be called initlazysorted) */
+/* Initialization function for the module */
 
 PyMODINIT_FUNC
 initlazysorted(void)
