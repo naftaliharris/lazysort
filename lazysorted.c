@@ -19,15 +19,19 @@ static PyTypeObject LS_Type;
 
 #define LSObject_Check(v)      (Py_TYPE(v) == &LS_Type)
 
-static LSObject *
-newLSObject(PyObject *arg)
+static PyObject *
+newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     LSObject *self;
-    self = PyObject_New(LSObject, &LS_Type);
+    self = (LSObject *)type->tp_alloc(type, 0);
     if (self == NULL)
         return NULL;
-    self->xs = NULL;
-    return self;
+
+    self->xs = PyList_Type.tp_new(&PyList_Type, args, kwds);
+    if (self->xs == NULL)
+        return NULL;
+
+    return (PyObject *)self;
 }
 
 /* LS methods */
@@ -35,7 +39,7 @@ newLSObject(PyObject *arg)
 static void
 LS_dealloc(LSObject *self)
 {
-    Py_XDECREF(self->xs);
+    Py_DECREF(self->xs);
     PyObject_Del(self);
 }
 
@@ -59,10 +63,6 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
     static char *kwlist[] = {"sequence", 0};
 
     if (!PyArg_ParseTupleAndKeywords(args, kw, "|O:list", kwlist, &arg))
-        return -1;
-
-    self->xs = PyList_Type.tp_new(&PyList_Type, args, kw);
-    if (self->xs == NULL)
         return -1;
 
     if (PyList_Type.tp_init(self->xs, args, kw))
@@ -112,7 +112,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_dictoffset*/
     (initproc)LS_init,      /*tp_init*/
     0,                      /*tp_alloc*/
-    0,                      /*tp_new*/
+    newLSObject,            /*tp_new*/
     0,                      /*tp_free*/
     0,                      /*tp_is_gc*/
 };
@@ -138,7 +138,6 @@ initlazysorted(void)
     /* Finalize the type object including setting type of the new type
      * object; doing it here is required for portability, too. */
 
-    LS_Type.tp_new = PyType_GenericNew;
     if (PyType_Ready(&LS_Type) < 0)
         return;
 
