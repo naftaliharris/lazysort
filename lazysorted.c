@@ -1,24 +1,53 @@
 /* LazySorted objects */
 
 #include "Python.h"
-#include <search.h>
 
-/* Definitions for the binary search tree of pivot points */
-typedef struct {
+/* Definitions and functions for the binary search tree of pivot points */
+
+typedef struct PivotNode {
     Py_ssize_t index;
+    struct PivotNode *left;
+    struct PivotNode *right;
+    struct PivotNode *parent;
     int flags;
 } PivotNode;
 
-int
-compareNodes(const void *pa, const void *pb)
+/* Finds PivotNodes left and right that bound the index */
+static void
+bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
 {
-    if (((PivotNode *)pa)->index < ((PivotNode *)pb)->index)
-        return -1;
-    if (((PivotNode *)pa)->index > ((PivotNode *)pb)->index)
-        return 1;
-    return 0;
+    *left = NULL;
+    *right = NULL;
+    PivotNode *current = root;
+    while (current != NULL) {
+        if (current->index < k) {
+            *left = current;
+            current = current->right;
+        }
+        else if(current->index > k) {
+            *right = current;
+            current = current->left;
+        }
+        else {
+            *left = current;
+            break;
+        }
+    }
 }
 
+static void
+free_tree(PivotNode *root)
+{
+    if (root->left != NULL)
+        free_tree(root->left);
+    if (root->right != NULL)
+        free_tree(root->right);
+
+    free(root);
+}
+
+/* The LazySorted object */
+ 
 typedef struct {
     PyObject_HEAD
     PyListObject        *xs;            /* Partially sorted list */
@@ -42,6 +71,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->root = NULL;
+    /* Add dummy pivot indices at -1 and n? */
 
     return (PyObject *)self;
 }
@@ -208,9 +238,7 @@ static void
 LS_dealloc(LSObject *self)
 {
     Py_DECREF(self->xs);
-    while (tdelete(self->root, (void **)&self->root, compareNodes) != NULL) {
-        /* do nothing */
-    }
+    /* free_tree(self->root); */ /* Add this back in when have insert code */
     PyObject_Del(self);
 }
 
