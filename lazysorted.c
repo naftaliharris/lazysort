@@ -1,16 +1,109 @@
 /* LazySorted objects */
 
 #include "Python.h"
+#include <time.h>
 
-/* Definitions and functions for the binary search tree of pivot points */
+/* Definitions and functions for the binary search tree of pivot points.
+ * The BST implementation is a Treap, selected because of its general speed,
+ * especially when inserting and removing elements, which happens a lot in this
+ * application. */
 
 typedef struct PivotNode {
     Py_ssize_t index;
+    int flags;
+    int priority;
     struct PivotNode *left;
     struct PivotNode *right;
     struct PivotNode *parent;
-    int flags;
 } PivotNode;
+
+#define SORTED 1
+#define UNSORTED 0
+
+/* Inserts an index, returning a pointer to the node, or NULL on error */
+static PivotNode *
+insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
+{
+    /* Build the node */
+    PivotNode *node = (PivotNode *)PyMem_Malloc(sizeof(PivotNode));
+    if (node == NULL)
+        return (PivotNode *)PyErr_NoMemory();
+    node->index = k;
+    node->flags = flags;
+    node->priority = rand(); /* XXX Security, thread-safety */
+    node->left = NULL;
+    node->right = NULL;
+
+    /* Special case the empty tree */
+    if (*root == NULL) {
+        node->parent = NULL;
+        *root = node;
+        return node;
+    }
+
+    /* Put the node in it's sorted order */
+    PivotNode *current = *root;
+    while (1) {
+        if (current->index < k) {
+            if (current->right == NULL) {
+                current->right = node;
+                node->parent = current;
+                break;
+            }
+            current = current->right;
+        }
+        else if (current->index > k) {
+            if (current->left == NULL) {
+                current->left = node;
+                node->parent = current;
+                break;
+            }
+            current = current->left;
+        }
+        else {
+            /* The pivot BST should always have unique pivots */
+            assert(0); /* XXX Raise python error? */
+        }
+    }
+
+    /* Reestablish the treap invariant if necessary */
+    PivotNode *child;
+    while (node->priority < node->parent->priority) {
+        if (node->index < node->parent->index) {
+            child = node->right;
+            node->right = node->parent;
+            node->parent->left = child;
+            node->parent = node->parent->parent;
+            node->right->parent = node;
+            if (child != NULL)
+                child->parent = node->right;
+        }
+        else {
+            child = node->left;
+            node->left = node->parent;
+            node->parent->right = child;
+            node->parent = node->parent->parent;
+            node->left->parent = node;
+            if (child != NULL)
+                child->parent = node->left;
+        }
+
+        /* Adjust node->parent's child pointer to point to node */
+        if (node->parent != NULL) {
+            if (k < node->parent->index) {
+                node->parent->left = node;
+            }
+            else {
+                node->parent->right = node;
+            }
+        }
+        else {
+            break;
+        }
+    }
+
+    return node;
+}
 
 /* Finds PivotNodes left and right that bound the index */
 static void
@@ -24,7 +117,7 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
             *left = current;
             current = current->right;
         }
-        else if(current->index > k) {
+        else if (current->index > k) {
             *right = current;
             current = current->left;
         }
@@ -43,7 +136,7 @@ free_tree(PivotNode *root)
     if (root->right != NULL)
         free_tree(root->right);
 
-    free(root);
+    PyMem_Free(root);
 }
 
 /* The LazySorted object */
@@ -71,7 +164,8 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->root = NULL;
-    /* Add dummy pivot indices at -1 and n? */
+    if (insert_pivot(-1, UNSORTED, &self->root) == NULL)
+        return NULL;
 
     return (PyObject *)self;
 }
@@ -238,7 +332,7 @@ static void
 LS_dealloc(LSObject *self)
 {
     Py_DECREF(self->xs);
-    /* free_tree(self->root); */ /* Add this back in when have insert code */
+    free_tree(self->root);
     PyObject_Del(self);
 }
 
@@ -273,6 +367,9 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
         return -1;
 
     if (PyList_Type.tp_init((PyObject *)self->xs, args, kw))
+        return -1;
+
+    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root) == NULL)
         return -1;
 
     return 0;
@@ -340,6 +437,8 @@ PyDoc_STRVAR(module_doc,
 PyMODINIT_FUNC
 initlazysorted(void)
 {
+    srand(time(NULL)); /* XXX Worry about security, thread-safety etc */
+
     PyObject *m;
 
     /* Finalize the type object including setting type of the new type
