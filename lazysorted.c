@@ -98,11 +98,13 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
                 node->parent->right = node;
             }
         }
-        else {
+        else {  /* The node has propogated up to the root */
+            *root = node;
             break;
         }
     }
 
+    assert((*root)->parent == NULL);
     return node;
 }
 
@@ -127,6 +129,8 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
             break;
         }
     }
+
+    assert (*left != NULL && *right != NULL);
 }
 
 static void
@@ -246,11 +250,11 @@ insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 static PyObject *indexerr = NULL;
 
 static PyObject *
-ls_item(LSObject *ls, Py_ssize_t i)
+ls_item(LSObject *ls, Py_ssize_t k)
 {
     Py_ssize_t xs_len = Py_SIZE(ls->xs);
 
-    if (i < 0 || i >= xs_len) {
+    if (k < 0 || k >= xs_len) {
         if (indexerr == NULL) {
             indexerr = PyString_FromString(
                 "list index out of range");
@@ -261,28 +265,37 @@ ls_item(LSObject *ls, Py_ssize_t i)
         return NULL;
     }
 
+    /* Find the best possible bounds */
+    PivotNode *left_node, *right_node;
+    bound_index(k, ls->root, &left_node, &right_node);
+    if (right_node->flags & SORTED || 
+        right_node->index == k || left_node->index == k) {
+        Py_INCREF(ls->xs->ob_item[k]);
+        return ls->xs->ob_item[k];
+    }
+
     /* Run quickselect */
-    Py_ssize_t left = 0;
-    Py_ssize_t right = xs_len;
+    Py_ssize_t left = left_node->index + 1;
+    Py_ssize_t right = right_node->index - 1;
     Py_ssize_t pivot_index;
 
     while (left + SORT_THRESH < right) {
         pivot_index = partition(ls->xs->ob_item, left, right);
-        if (pivot_index < i) {
+        if (pivot_index < k) {
             left = pivot_index + 1;
         }
-        else if (pivot_index > i) {
+        else if (pivot_index > k) {
             right = pivot_index;
         }
         else {
-            Py_INCREF(ls->xs->ob_item[i]);
-            return ls->xs->ob_item[i];
+            Py_INCREF(ls->xs->ob_item[k]);
+            return ls->xs->ob_item[k];
         }
     }
 
     insertion_sort(ls->xs->ob_item, left, right);
-    Py_INCREF(ls->xs->ob_item[i]);
-    return ls->xs->ob_item[i];
+    Py_INCREF(ls->xs->ob_item[k]);
+    return ls->xs->ob_item[k];
 }
 
 static PyObject *
