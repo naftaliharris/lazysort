@@ -1,7 +1,8 @@
 /* LazySorted objects */
 
-#include "Python.h"
+#include <Python.h>
 #include <time.h>
+#include "params.h"
 
 /* Definitions and functions for the binary search tree of pivot points.
  * The BST implementation is a Treap, selected because of its general speed,
@@ -172,7 +173,8 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 /* Private helper functions for partial sorting */
 
-/* These macros are basically taken from list.c */
+/* These macros are basically taken from list.c
+ * Returns 1 if x < y, 0 if x >= y, and -1 on error */
 #define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT)
 
 #define IFLT(X, Y) if ((ltflag = ISLT(X, Y)) < 0) goto fail;  \
@@ -187,7 +189,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static Py_ssize_t
 pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
-    /* XXX */
+    /* XXX Better pivot selection */
     return left;
 }
 
@@ -224,6 +226,21 @@ fail:
     return -1;
 }
 
+/* Runs insertion sort on the items between left and right */
+static void
+insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+{
+    PyObject *tmp;
+    Py_ssize_t i, j;
+
+    for (i = left; i < right; i++) {
+        tmp = ob_item[i];
+        for (j = i; j > 0 && ISLT(tmp, ob_item[j - 1]); j--)
+            ob_item[j] = ob_item[j - 1];
+        ob_item[j] = tmp;
+    }
+}
+
 /* LazySorted methods */
 
 static PyObject *indexerr = NULL;
@@ -249,7 +266,7 @@ ls_item(LSObject *ls, Py_ssize_t i)
     Py_ssize_t right = xs_len;
     Py_ssize_t pivot_index;
 
-    while (left < right) {
+    while (left + SORT_THRESH < right) {
         pivot_index = partition(ls->xs->ob_item, left, right);
         if (pivot_index < i) {
             left = pivot_index + 1;
@@ -258,13 +275,14 @@ ls_item(LSObject *ls, Py_ssize_t i)
             right = pivot_index;
         }
         else {
-            left = pivot_index;
-            break;
+            Py_INCREF(ls->xs->ob_item[i]);
+            return ls->xs->ob_item[i];
         }
     }
 
-    Py_INCREF(ls->xs->ob_item[left]);
-    return ls->xs->ob_item[left];
+    insertion_sort(ls->xs->ob_item, left, right);
+    Py_INCREF(ls->xs->ob_item[i]);
+    return ls->xs->ob_item[i];
 }
 
 static PyObject *
@@ -369,7 +387,7 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
     if (PyList_Type.tp_init((PyObject *)self->xs, args, kw))
         return -1;
 
-    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root) == NULL)
+    if (insert_pivot(Py_SIZE(self->xs) + 1, UNSORTED, &self->root) == NULL)
         return -1;
 
     return 0;
