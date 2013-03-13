@@ -21,9 +21,43 @@ typedef struct PivotNode {
 #define SORTED 1
 #define UNSORTED 0
 
-/* Inserts an index, returning a pointer to the node, or NULL on error */
+/* A recursive function getting the consistency of a node
+ * Does not assume that the node is the root of the tree */
+static void
+assert_node(PivotNode *node)
+{
+    if (node->left != NULL) {
+        assert(node->left->index < node->index);
+        assert(node->left->priority <= node->priority);
+        assert(node->left->parent == node);
+        assert_node(node->left);
+    }
+    if (node->right != NULL) {
+        assert(node->right->index > node->index);
+        assert(node->right->priority <= node->priority);
+        assert(node->right->parent == node);
+        assert_node(node->right);
+    }
+    if (node->parent != NULL) {
+        /* Exactly one of node's parent's children is node */
+        assert((node->parent->left != node) != (node->parent->right != node));
+    }
+}
+
+/* A series of assert statements that the entire tree is consistent */
+static void
+assert_tree(PivotNode *root)
+{
+    assert(root != NULL);
+    assert(root->parent == NULL);
+    assert_node(root);
+}
+
+/* Inserts an index, returning a pointer to the node, or NULL on error.
+ * *root is the root of the tree, while start is the node to insert from.
+ */
 static PivotNode *
-insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
+insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
 {
     /* Build the node */
     PivotNode *node = (PivotNode *)PyMem_Malloc(sizeof(PivotNode));
@@ -43,7 +77,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
     }
 
     /* Put the node in it's sorted order */
-    PivotNode *current = *root;
+    PivotNode *current = start;
     while (1) {
         if (current->index < k) {
             if (current->right == NULL) {
@@ -67,26 +101,50 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
         }
     }
 
-    /* Reestablish the treap invariant if necessary */
-    PivotNode *child;
-    while (node->priority < node->parent->priority) {
+    /* Reestablish the treap invariant if necessary by tree rotations */
+    PivotNode *child, *parent, *grandparent;
+    while (node->priority > node->parent->priority) {
+        /*          (parent)    (node)
+         *            /              \
+         *           /                \
+         *          /                  \
+         *     (node)        ->       (parent)
+         *        \                     /
+         *         \                   /
+         *       (child)            (child)
+         */
         if (node->index < node->parent->index) {
             child = node->right;
-            node->right = node->parent;
-            node->parent->left = child;
-            node->parent = node->parent->parent;
-            node->right->parent = node;
+            parent = node->parent;
+            grandparent = parent->parent;
+
+            node->parent = grandparent;
+            node->right = parent;
+            parent->parent = node;
+            parent->left = child;
             if (child != NULL)
-                child->parent = node->right;
+                child->parent = parent;
         }
+        /* (parent)                (node)
+         *      \                   /
+         *       \                 /
+         *        \               /
+         *        (node)  ->  (parent)
+         *        /              \
+         *       /                \
+         *    (child)           (child)
+         */
         else {
             child = node->left;
-            node->left = node->parent;
-            node->parent->right = child;
-            node->parent = node->parent->parent;
-            node->left->parent = node;
+            parent = node->parent;
+            grandparent = parent->parent;
+
+            node->parent = grandparent;
+            node->left = parent;
+            parent->parent = node;
+            parent->right = child;
             if (child != NULL)
-                child->parent = node->left;
+                child->parent = parent;
         }
 
         /* Adjust node->parent's child pointer to point to node */
@@ -104,14 +162,17 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root)
         }
     }
 
-    assert((*root)->parent == NULL);
+    assert_tree(*root);
     return node;
 }
 
 /* Finds PivotNodes left and right that bound the index */
+/* Never returns k in right_node, only the left, if applicable */
 static void
 bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
 {
+    assert_tree(root);
+
     *left = NULL;
     *right = NULL;
     PivotNode *current = root;
@@ -136,6 +197,8 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
 static void
 free_tree(PivotNode *root)
 {
+    assert_node(root);  /* root might not actually be the root of the tree */
+
     if (root->left != NULL)
         free_tree(root->left);
     if (root->right != NULL)
@@ -169,7 +232,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->root = NULL;
-    if (insert_pivot(-1, UNSORTED, &self->root) == NULL)
+    if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
         return NULL;
 
     return (PyObject *)self;
@@ -266,34 +329,57 @@ ls_item(LSObject *ls, Py_ssize_t k)
     }
 
     /* Find the best possible bounds */
-    PivotNode *left_node, *right_node;
-    bound_index(k, ls->root, &left_node, &right_node);
-    if (right_node->flags & SORTED || 
-        right_node->index == k || left_node->index == k) {
+    PivotNode *left, *right;
+    bound_index(k, ls->root, &left, &right);
+    /* bound_index never returns k in right */
+    if (right->flags & SORTED || left->index == k) {
         Py_INCREF(ls->xs->ob_item[k]);
         return ls->xs->ob_item[k];
     }
 
     /* Run quickselect */
-    Py_ssize_t left = left_node->index + 1;
-    Py_ssize_t right = right_node->index - 1;
     Py_ssize_t pivot_index;
 
-    while (left + SORT_THRESH < right) {
-        pivot_index = partition(ls->xs->ob_item, left, right);
+    while (left->index + 1 + SORT_THRESH <= right->index) {
+        pivot_index = partition(ls->xs->ob_item,
+                                left->index + 1,
+                                right->index);
         if (pivot_index < k) {
-            left = pivot_index + 1;
+            if (left->right == NULL) {
+                left = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+            }
+            else {
+                left = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+            }
+            if (left == NULL)
+                return NULL;
         }
         else if (pivot_index > k) {
-            right = pivot_index;
+            if (left->right == NULL) {
+                right = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+            }
+            else {
+                right = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+            }
+            if (right == NULL)
+                return NULL;
         }
         else {
+            if (left->right == NULL) {
+                left = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+            }
+            else {
+                left = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+            }
+            if (left == NULL) /* We're just using left as a variable */
+                return NULL;
             Py_INCREF(ls->xs->ob_item[k]);
             return ls->xs->ob_item[k];
         }
     }
 
-    insertion_sort(ls->xs->ob_item, left, right);
+    insertion_sort(ls->xs->ob_item, left->index + 1, right->index);
+    right->flags = SORTED;
     Py_INCREF(ls->xs->ob_item[k]);
     return ls->xs->ob_item[k];
 }
@@ -400,7 +486,8 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
     if (PyList_Type.tp_init((PyObject *)self->xs, args, kw))
         return -1;
 
-    if (insert_pivot(Py_SIZE(self->xs) + 1, UNSORTED, &self->root) == NULL)
+    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
+            NULL)
         return -1;
 
     return 0;

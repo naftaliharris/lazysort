@@ -11,7 +11,7 @@ from lazysorted import LazySorted
 
 
 def random_median():
-    n = 1000001
+    n = 10001
     xs = range(n)
     reshuffle = lambda: random.shuffle(xs)
     full_median = lambda: sorted(xs)[n // 2]
