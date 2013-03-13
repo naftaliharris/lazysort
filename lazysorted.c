@@ -191,7 +191,7 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
         }
     }
 
-    assert (*left != NULL && *right != NULL);
+    assert (*left != NULL && ((*left)->index == k || *right != NULL));
 }
 
 static void
@@ -331,8 +331,9 @@ ls_item(LSObject *ls, Py_ssize_t k)
     /* Find the best possible bounds */
     PivotNode *left, *right;
     bound_index(k, ls->root, &left, &right);
-    /* bound_index never returns k in right */
-    if (right->flags & SORTED || left->index == k) {
+    /* bound_index never returns k in right, but right might be NULL if
+     * left->index == k, so check left->index first. */
+    if (left->index == k || right->flags & SORTED) {
         Py_INCREF(ls->xs->ob_item[k]);
         return ls->xs->ob_item[k];
     }

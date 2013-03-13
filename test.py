@@ -27,6 +27,18 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEqual(LazySorted(xs)[k], k,
                                      msg="xs = %s; k = %d" % (xs, k))
 
+    def test_multiple_select(self):
+        for n in xrange(1, 64):
+            xs = range(n)
+            ks = 2 * range(n)  # include multiple accesses
+            for rep in xrange(1, 10):
+                random.shuffle(xs)
+                random.shuffle(ks)
+                ls = LazySorted(xs)
+                for k in ks:
+                    self.assertEqual(ls[k], k, msg="xs = %s; ks = %s; k = %d" %
+                                     (xs, ks, k))
+
     def test_len(self):
         for n in xrange(1024):
             xs = range(n)
