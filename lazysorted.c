@@ -18,11 +18,16 @@ typedef struct PivotNode {
     struct PivotNode *parent;
 } PivotNode;
 
-#define SORTED 1
+/* SORTED_RIGHT means the pivot is to the right of a sorted region.
+ * SORTED_LEFT means the pivot is the left of a sorted region */
+#define SORTED_RIGHT 1
+#define SORTED_LEFT 2
 #define UNSORTED 0
 
-/* A recursive function getting the consistency of a node
- * Does not assume that the node is the root of the tree */
+/* A recursive function getting the consistency of a node.
+ * Does not assume that the node is the root of the tree, and does NOT examine
+ * the parentage of node. This is important, because it is often called on
+ * nodes whose future parents don't know them yet, like in merge_trees(.) */
 static void
 assert_node(PivotNode *node)
 {
@@ -37,10 +42,6 @@ assert_node(PivotNode *node)
         assert(node->right->priority <= node->priority);
         assert(node->right->parent == node);
         assert_node(node->right);
-    }
-    if (node->parent != NULL) {
-        /* Exactly one of node's parent's children is node */
-        assert((node->parent->left != node) != (node->parent->right != node));
     }
 }
 
@@ -97,7 +98,8 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
         }
         else {
             /* The pivot BST should always have unique pivots */
-            assert(0); /* XXX Raise python error? */
+            PyErr_SetString(PyExc_SystemError, "All pivots must be unique");
+            return NULL;
         }
     }
 
@@ -164,6 +166,133 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
 
     assert_tree(*root);
     return node;
+}
+
+/* Takes two trees and merges them into one while preserving the treap 
+ * invariant. left must have a smaller index than right. */
+static PivotNode *
+merge_trees(PivotNode *left, PivotNode *right)
+{
+    assert(left != NULL || right != NULL);
+    
+    if (left == NULL)
+        return right;
+    if (right == NULL)
+        return left;
+
+    assert(left->parent == right->parent);
+    assert(left->index < right->index);
+    assert_node(left);
+    assert_node(right);
+
+    if (left->priority > right->priority) {
+        right->parent = left;
+        left->right = merge_trees(left->right, right);
+
+        assert_node(left);
+        return left;
+    }
+    else {
+        left->parent = right;
+        right->left = merge_trees(left, right->left);
+
+        assert_node(right);
+        return right;
+    }
+}
+
+static void
+delete_node(PivotNode *node, PivotNode **root)
+{
+    assert_tree(*root);
+    
+    if (node->left == NULL) {
+        /* node has at most one child in node->right, so we just have the 
+         * grandparent adopt it, if node is not the root. If node is the root,
+         * we promote the child to root. */
+        if (node->parent != NULL) {
+            if (node->parent->left == node) {
+                node->parent->left = node->right;
+            }
+            else {
+                node->parent->right = node->right;
+            }
+        }
+        else {  /* Node is the root */
+            *root = node->right;
+        }
+
+        if (node->right != NULL) {
+            node->right->parent = node->parent;
+        }
+
+        PyMem_Free(node);
+    }
+    else {
+        if (node->right == NULL) {
+            /* node has a single child in node->left, so have grandparent
+             * adopt it as above */
+            if (node->parent != NULL) {
+                if (node->parent->left == node) {
+                    node->parent->left = node->left;
+                }
+                else {
+                    node->parent->right = node->left;
+                }
+            }
+            else {  /* Node is the root */
+                *root = node->left;
+            }
+
+            /* node->left is not NULL because of the outer if-else statement */
+            node->left->parent = node->parent;
+
+            PyMem_Free(node);
+        }
+        else {
+            /* The hard case: node has two children. We merge the two children
+             * into one treap, and then replace node by this treap */
+            PivotNode *children = merge_trees(node->left, node->right);
+            
+            if (node->parent != NULL) {
+                if (node->parent->left == node) {
+                    node->parent->left = children;
+                }
+                else {
+                    node->parent->right = children;
+                }
+            }
+            else {  /* Node is the root */
+                *root = children;
+            }
+
+            /* children is not NULL since node has two children */
+            children->parent = node->parent;
+
+            PyMem_Free(node);
+        }
+    }
+
+    assert_tree(*root);
+}
+
+/* If a sorted pivot is between two sorted section, removes the sorted pivot */
+static void
+depivot(PivotNode *left, PivotNode *right, PivotNode **root)
+{
+    assert_tree(*root);
+    assert(left->flags & SORTED_LEFT);
+    assert(right->flags & SORTED_RIGHT);
+    
+    if (left->flags & SORTED_RIGHT) {
+        delete_node(left, root);
+    }
+
+    if (right->flags & SORTED_LEFT) {
+        delete_node(right, root);
+    }
+
+    assert_tree(*root);
 }
 
 /* Finds PivotNodes left and right that bound the index */
@@ -333,7 +462,7 @@ ls_item(LSObject *ls, Py_ssize_t k)
     bound_index(k, ls->root, &left, &right);
     /* bound_index never returns k in right, but right might be NULL if
      * left->index == k, so check left->index first. */
-    if (left->index == k || right->flags & SORTED) {
+    if (left->index == k || right->flags & SORTED_RIGHT) {
         Py_INCREF(ls->xs->ob_item[k]);
         return ls->xs->ob_item[k];
     }
@@ -374,13 +503,17 @@ ls_item(LSObject *ls, Py_ssize_t k)
             }
             if (left == NULL) /* We're just using left as a variable */
                 return NULL;
+
             Py_INCREF(ls->xs->ob_item[k]);
             return ls->xs->ob_item[k];
         }
     }
 
     insertion_sort(ls->xs->ob_item, left->index + 1, right->index);
-    right->flags = SORTED;
+    left->flags |= SORTED_LEFT;
+    right->flags |= SORTED_RIGHT;
+    depivot(left, right, &ls->root);
+
     Py_INCREF(ls->xs->ob_item[k]);
     return ls->xs->ob_item[k];
 }

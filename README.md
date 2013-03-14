@@ -22,6 +22,9 @@ In short, you can use LazySorted the same way you use the sorted(.) function:
     >>> "foo" in xs_sorted
     False
 
+LazySorted objects have a few extra methods, however: (unsorted data between
+intervals for alpha-trimmed mean, for example)
+
 How it works
 ------------
 
@@ -37,7 +40,7 @@ Things you can use lazysorted for
 3. Quickly iterating through the first few sorted elements of a list
 4. Computing the deciles or quartiles of some distribution
 
-All of these can be found in examples.py
+All of these will be found in examples.py
 
 
 Things you should not use lazysorted for
