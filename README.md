@@ -86,3 +86,11 @@ Performance Tuning
 ------------------
 
 ...
+
+FAQ
+---
+
++ Doesn't numpy have a median and percentile function?
+
+Yes, but it's implemented by sorting the entire array and then reading off the
+requested values, not with quickselect or another O(n) selection algorithm.
