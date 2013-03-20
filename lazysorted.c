@@ -54,6 +54,32 @@ assert_tree(PivotNode *root)
     assert_node(root);
 }
 
+/* Returns the next (bigger) pivot, or NULL if it's the last pivot */
+PivotNode *
+next_pivot(PivotNode *current)
+{
+    PivotNode *curr = current;
+    if (curr->right != NULL) {
+        curr = curr->right;
+        while (curr->left != NULL) {
+            curr = curr->left;
+        }
+        return curr;
+    }
+    else {
+        while (curr->parent != NULL && curr->parent->index < curr->index) {
+            curr = curr->parent;
+        }
+
+        if (curr->parent == NULL) {
+            return NULL;
+        }
+        else {
+            return curr;
+        }
+    }
+}
+
 /* Inserts an index, returning a pointer to the node, or NULL on error.
  * *root is the root of the tree, while start is the node to insert from.
  */
@@ -326,7 +352,7 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
 static void
 free_tree(PivotNode *root)
 {
-    assert_node(root);  /* root might not actually be the root of the tree */
+    assert_node(root);  /* might not be the actual root because of recursion */
 
     if (root->left != NULL)
         free_tree(root->left);
@@ -385,8 +411,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static Py_ssize_t
 pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
-    /* XXX Better pivot selection */
-    return left;
+    return left + rand() % (right - left);
 }
 
 /* Partitions the data between left and right and returns the pivot index,
@@ -394,7 +419,7 @@ pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 static Py_ssize_t
 partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
-    PyObject *tmp;
+    PyObject *tmp;  /* Used by SWAP macro */
     PyObject *pivot;
     Py_ssize_t ltflag;
 
@@ -418,7 +443,7 @@ partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
     SWAP(left, last_less);
     return last_less;
 
-fail:
+fail:  /* From IFLT macro */
     return -1;
 }
 
@@ -445,6 +470,7 @@ find_k(LSObject *ls, Py_ssize_t k)
     /* Find the best possible bounds */
     PivotNode *left, *right;
     bound_index(k, ls->root, &left, &right);
+
     /* bound_index never returns k in right, but right might be NULL if
      * left->index == k, so check left->index first. */
     if (left->index == k || right->flags & SORTED_RIGHT) {
@@ -480,13 +506,17 @@ find_k(LSObject *ls, Py_ssize_t k)
         }
         else {
             if (left->right == NULL) {
-                left = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+                if (insert_pivot(pivot_index, UNSORTED, &ls->root, left) ==
+                    NULL) {
+                    return -1;
+                }
             }
             else {
-                left = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+                if (insert_pivot(pivot_index, UNSORTED, &ls->root, right) ==
+                    NULL) {
+                    return -1;
+                }
             }
-            if (left == NULL) /* We're just using left as a variable */
-                return -1;
 
             return 0;
         }
@@ -533,56 +563,37 @@ ls_slice(LSObject* ls, Py_ssize_t start, Py_ssize_t stop)
 {
     assert(0 <= start && start < stop && stop <= Py_SIZE(ls->xs));
 
+    /* Make sure that start and stop are at their sorted positions */
+    if (find_k(ls, start) < 0) return NULL;
+    if (find_k(ls, stop) < 0) return NULL;
+
+    /* The xs list is always partially sorted, with pivots partioning up the
+     * space, like in this picture:
+     *
+     * | ~~~~~ | ~~~ | ~~~~~ | ~~ | ~~~~~~~ |
+     *
+     * '|' indicates a pivot and '~~' indicates unsorted data.
+     *
+     * We now iterate through the regions bounding our data, and sort them.
+     */
+    PivotNode *current, *next;
+    bound_index(start, ls->root, &current, &next);
+
+    while (current->index < stop) {
+        if (current->flags & SORTED_LEFT) {
+            assert(next->flags & SORTED_RIGHT);
+            current = next;
+            next = next_pivot(current);
+        }
+
+        /* Sort between current and next */
+        /* TODO: Remove internal pivots */
+
+    }
+
     PyListObject *result = (PyListObject *)PyList_New(stop - start);
-    if (!result) return NULL;
-
-    /* Find the best possible bounds */
-    PivotNode *left, *midleft, *midright, *right;
-    bound_index(start, ls->root, &left, &midleft);
-    bound_index(stop, ls->root, &midright, &right);
-
-    /* Check if it's inside a sorted section */
-    /* XXX midright, right might be NULL */
-    if (left == midright && right->flags & SORTED_RIGHT) {
-        assert(midleft == right);
-        assert(left->flags & SORTED_LEFT);
-    }
-    else {
-        /* We have that left->index <= start < midleft->index, and analogous
-         * for right. Our behavior after discovering this must depend on
-         * whether the points between left->index and midleft->index are sorted
-         * or not.
-         *
-         * For example, consider the left side. There are two cases:
-         *
-         * 1) [left, ... sorted indices ..., midleft, whatever ...]
-         * In this case, the user is requesting data whose left-endpoint is in
-         * middle of a sorted region, (which we don't have to sort), and so we
-         * can begin sorting to the right of midleft.
-         *
-         * 2) [left, ... unsorted indices ..., midleft, whatever ...]
-         * In this case, the left-endpoint (start) requested by the user is 
-         * somewhere in the unsorted data, so we must find it, and then sort
-         * everything to its right. 
-         */
-        if (midleft->flags & SORTED_RIGHT) {
-            left = midleft;
-        }
-        else {
-
-        }
-
-        if (midright->flags & SORTED_LEFT) {
-            right = midright;
-        }
-        else {
-
-        }
-
-        /* Now sort all the areas between pivots */
-        /* TODO */
-
-    }
+    if (!result)
+        return NULL;
 
     Py_ssize_t i;
     for (i = start; i < stop; i++) {
