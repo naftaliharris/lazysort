@@ -71,7 +71,7 @@ Testing
 -------
 
 I've put in a fair bit of effort to test that lazysorted actually does what
-it's supposed to. You can test it yourself with
+it's supposed to. You can test it yourself (after installing it) with
 
     $ python test.py
 
@@ -93,4 +93,24 @@ FAQ
 + Doesn't numpy have a median and percentile function?
 
 Yes, but it's implemented by sorting the entire array and then reading off the
-requested values, not with quickselect or another O(n) selection algorithm. And LazySorted is empirically faster.
+requested values, not with quickselect or another O(n) selection algorithm.
+And LazySorted is empirically faster.
+
++ How is lazysorted licensed?
+
+lazysorted is BSD licensed. So you can use it pretty much however you like!
+See LICENSE for more details.
+
+
+Email me!
+---------
+
+If you use this software and feel so inclined, I'd greatly appreciate an email
+just saying that you tried it out. (My email is naftaliharris@gmail.com).
+Even something as simple as the following would be awesome:
+
+    Hey Naftali,
+    
+    I tried out lazysorted to compute medians faster. Thought you'd like to know!
+    
+    --Jim

@@ -24,6 +24,34 @@ typedef struct PivotNode {
 #define SORTED_LEFT 2
 #define UNSORTED 0
 
+/* Returns the next (bigger) pivot, or NULL if it's the last pivot */
+PivotNode *
+next_pivot(PivotNode *current)
+{
+    PivotNode *curr = current;
+    if (curr->right != NULL) {
+        curr = curr->right;
+        while (curr->left != NULL) {
+            curr = curr->left;
+        }
+    }
+    else {
+        while (curr->parent != NULL && curr->parent->index < curr->index) {
+            curr = curr->parent;
+        }
+
+        if (curr->parent == NULL) {
+            return NULL;
+        }
+        else {
+            curr = curr->parent;
+        }
+    }
+
+    assert(curr->index > current->index);
+    return curr;
+}
+
 /* A recursive function getting the consistency of a node.
  * Does not assume that the node is the root of the tree, and does NOT examine
  * the parentage of node. This is important, because it is often called on
@@ -52,31 +80,19 @@ assert_tree(PivotNode *root)
     assert(root != NULL);
     assert(root->parent == NULL);
     assert_node(root);
-}
 
-/* Returns the next (bigger) pivot, or NULL if it's the last pivot */
-PivotNode *
-next_pivot(PivotNode *current)
-{
-    PivotNode *curr = current;
-    if (curr->right != NULL) {
-        curr = curr->right;
-        while (curr->left != NULL) {
-            curr = curr->left;
-        }
-        return curr;
-    }
-    else {
-        while (curr->parent != NULL && curr->parent->index < curr->index) {
-            curr = curr->parent;
-        }
+    PivotNode *prev = NULL;
+    PivotNode *curr = root;
+    while (curr->left != NULL)
+        curr = curr->left;
+    while (curr != NULL) {
+        if (curr->flags & SORTED_LEFT)
+            assert(next_pivot(curr)->flags & SORTED_RIGHT);
+        if (curr->flags & SORTED_RIGHT)
+            assert(prev->flags & SORTED_LEFT);
 
-        if (curr->parent == NULL) {
-            return NULL;
-        }
-        else {
-            return curr;
-        }
+        prev = curr;
+        curr = next_pivot(curr);
     }
 }
 
@@ -346,7 +362,8 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
         }
     }
 
-    assert (*left != NULL && ((*left)->index == k || *right != NULL));
+    assert(*left != NULL && ((*left)->index == k || *right != NULL));
+    assert((*left)->index == k || *right == next_pivot(*left));
 }
 
 static void
@@ -447,7 +464,7 @@ fail:  /* From IFLT macro */
     return -1;
 }
 
-/* Runs insertion sort on the items between left and right */
+/* Runs insertion sort on the items left <= i < right */
 static void
 insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
@@ -462,10 +479,33 @@ insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
     }
 }
 
+/* Runs quicksort on the items left <= i < right, returning 1 on success
+ * or zero on error. Does not affect stored pivots at all. */
+static int
+quick_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+{
+    if (right - left <= SORT_THRESH) {
+        insertion_sort(ob_item, left, right);
+        return 0;
+    }
+
+    Py_ssize_t pivot_index = partition(ob_item, left, right);
+    if (pivot_index < 0)
+        return -1;
+
+    if (quick_sort(ob_item, left, pivot_index) < 0)
+        return -1;
+
+    if (quick_sort(ob_item, pivot_index + 1, right) < 0)
+        return -1;
+
+    return 0;
+}
+
 /* Sorts the list ls sufficiently such that ls->xs->ob_item[k] is actually the
  * kth value in sorted order. Returns 0 on success and -1 on error. */
 static int
-find_k(LSObject *ls, Py_ssize_t k)
+sort_point(LSObject *ls, Py_ssize_t k)
 {
     /* Find the best possible bounds */
     PivotNode *left, *right;
@@ -530,6 +570,62 @@ find_k(LSObject *ls, Py_ssize_t k)
     return 0;
 }
 
+/* Sorts the list ls sufficiently such that everything between indices start
+ * and stop is in sorted order. Returns 0 on success and -1 on error. */
+static int
+sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
+{
+    /* The xs list is always partially sorted, with pivots partioning up the
+     * space, like in this picture:
+     *
+     * | ~~~~~ | ~~~ | ~~~~~ | ~~ | ~~~~~~~ |
+     *
+     * '|' indicates a pivot and '~~' indicates unsorted data.
+     *
+     * So we iterate through the regions bounding our data, and sort them.
+     */
+
+    assert(0 <= start && start < stop && stop <= Py_SIZE(ls->xs));
+
+    if (sort_point(ls, start) < 0)
+        return -1;
+    if (sort_point(ls, stop) < 0)
+        return -1;
+
+    PivotNode *current, *next;
+    bound_index(start, ls->root, &current, &next);
+    if (current->index == start)
+        next = next_pivot(current);
+
+    while (current->index < stop) {
+        if (current->flags & SORTED_LEFT) {
+            assert(next->flags & SORTED_RIGHT);
+        }
+        else {
+            /* Since we are sorting the entire region, we don't need to keep
+             * track of pivots, and so we can use vanilla quicksort */
+            quick_sort(ls->xs->ob_item, current->index + 1, next->index);
+            current->flags |= SORTED_LEFT;
+            next->flags |= SORTED_RIGHT;
+        }
+
+        if (current->flags & SORTED_RIGHT) {
+            delete_node(current, &ls->root);
+        }
+
+        current = next;
+        next = next_pivot(current);
+    }
+
+    assert(current->flags & SORTED_RIGHT);
+    if (current->flags & SORTED_LEFT) {
+        delete_node(current, &ls->root);
+    }
+
+    return 0;
+}
+
+
 /* LazySorted methods */
 
 static PyObject *indexerr = NULL;
@@ -537,6 +633,8 @@ static PyObject *indexerr = NULL;
 static PyObject *
 ls_item(LSObject *ls, Py_ssize_t k)
 {
+    /* TODO: Really consider moving this to ls_subscript */
+
     Py_ssize_t xs_len = Py_SIZE(ls->xs);
 
     if (k < 0 || k >= xs_len) {
@@ -550,7 +648,7 @@ ls_item(LSObject *ls, Py_ssize_t k)
         return NULL;
     }
 
-    if (find_k(ls, k) < 0)
+    if (sort_point(ls, k) < 0)
         return NULL;
 
     Py_INCREF(ls->xs->ob_item[k]);
@@ -561,38 +659,13 @@ ls_item(LSObject *ls, Py_ssize_t k)
 static PyListObject *
 ls_slice(LSObject* ls, Py_ssize_t start, Py_ssize_t stop)
 {
-    assert(0 <= start && start < stop && stop <= Py_SIZE(ls->xs));
+    /* TODO: Really consider moving this to ls_subscript */
 
-    /* Make sure that start and stop are at their sorted positions */
-    if (find_k(ls, start) < 0) return NULL;
-    if (find_k(ls, stop) < 0) return NULL;
-
-    /* The xs list is always partially sorted, with pivots partioning up the
-     * space, like in this picture:
-     *
-     * | ~~~~~ | ~~~ | ~~~~~ | ~~ | ~~~~~~~ |
-     *
-     * '|' indicates a pivot and '~~' indicates unsorted data.
-     *
-     * We now iterate through the regions bounding our data, and sort them.
-     */
-    PivotNode *current, *next;
-    bound_index(start, ls->root, &current, &next);
-
-    while (current->index < stop) {
-        if (current->flags & SORTED_LEFT) {
-            assert(next->flags & SORTED_RIGHT);
-            current = next;
-            next = next_pivot(current);
-        }
-
-        /* Sort between current and next */
-        /* TODO: Remove internal pivots */
-
-    }
+    if (sort_range(ls, start, stop) < 0)
+        return NULL;
 
     PyListObject *result = (PyListObject *)PyList_New(stop - start);
-    if (!result)
+    if (result == NULL)
         return NULL;
 
     Py_ssize_t i;
@@ -619,7 +692,7 @@ ls_subscript(LSObject* self, PyObject* item)
     else if (PySlice_Check(item)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self),
+        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self->xs),
                          &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -640,6 +713,13 @@ ls_subscript(LSObject* self, PyObject* item)
                      item->ob_type->tp_name);
         return NULL;
     }
+}
+
+/* Returns (possibly unsorted) data between start and stop by step */
+static PyObject *
+between(LSObject *self, PyObject *start, PyObject *stop, PyObject *step)
+{
+    return NULL;
 }
 
 static Py_ssize_t
@@ -751,7 +831,7 @@ static PyMethodDef ls_methods[] = {
 };
 
 PyDoc_STRVAR(module_doc,
-"This is a template module just for instruction.");
+"TODO: Add module docs...");
 
 /* Initialization function for the module */
 

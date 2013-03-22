@@ -46,6 +46,18 @@ class TestLazySorted(unittest.TestCase):
             self.assertEqual(len(ls), n)
             self.assertEqual(ls.__len__(), n)
 
+    def test_select_range(self):
+        for n in xrange(1, 128):
+            xs = range(n)
+            for list_rep in xrange(1, 5):
+                random.shuffle(xs)
+                ls = LazySorted(xs)
+                for select_rep in xrange(128):
+                    a, b = random.randrange(n), random.randrange(n)
+                    a, b = min(a, b), max(a, b)
+                    self.assertEqual(ls[a:b], range(a, b), msg="xs = %s; "
+                                     "(a, b) = (%d, %d); select_rep = %d" %
+                                     (xs, a, b, select_rep))
 
 if __name__ == "__main__":
     unittest.main()
