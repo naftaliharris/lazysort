@@ -718,17 +718,57 @@ ls_subscript(LSObject* self, PyObject* item)
     }
 }
 
-/* Returns (possibly unsorted) data between start and stop by step */
+/* Returns (possibly unsorted) data in a specified contiguous range */
 static PyObject *
-between(LSObject *self, PyObject *start, PyObject *stop, PyObject *step)
+between(LSObject *self, PyObject *args)
 {
-    return NULL;
+    Py_ssize_t left;
+    Py_ssize_t right;
+
+    if (!PyArg_ParseTuple(args, "nn:list", &left, &right))
+        return NULL;
+
+    Py_ssize_t xlen = Py_SIZE(self->xs);
+    if (left < 0) {
+        left += xlen;
+    }
+    else if (left > xlen) {
+        left = xlen;
+    }
+
+    if (right < 0) {
+        right += xlen;
+    }
+    else if (right > xlen) {
+        right = xlen;
+    }
+
+    if (left >= right || right <= 0) {
+        return PyList_New(0);
+    }
+
+    if (left != 0 && sort_point(self, left) < 0)
+        return NULL;
+    if (right != xlen && sort_point(self, right) < 0)
+        return NULL;
+
+    PyListObject *result = (PyListObject *)PyList_New(right - left);
+    if (result == NULL)
+        return NULL;
+
+    Py_ssize_t k;
+    for (k = left; k < right; k++) {
+        Py_INCREF(self->xs->ob_item[k]);
+        result->ob_item[k - left] = self->xs->ob_item[k];
+    }
+
+    return (PyObject *)result;
 }
 
 static Py_ssize_t
-ls_length(LSObject *ls)
+ls_length(LSObject *self)
 {
-    return Py_SIZE(ls->xs);
+    return Py_SIZE(self->xs);
 }
 
 static void
@@ -739,18 +779,11 @@ LS_dealloc(LSObject *self)
     PyObject_Del(self);
 }
 
-static PyObject *
-LS_xs(LSObject *self)
-{
-    Py_INCREF(self->xs);
-    return (PyObject *)self->xs;
-}
-
 static PyMethodDef LS_methods[] = {
-    {"__getitem__",     (PyCFunction)ls_subscript, METH_O|METH_COEXIST,
+    {"__getitem__", (PyCFunction)ls_subscript, METH_O|METH_COEXIST,
         PyDoc_STR("__getitem__ ADD Documentation")},
-    {"get_xs",          (PyCFunction)LS_xs, METH_NOARGS,
-        PyDoc_STR("get_xs() -> List")},
+    {"between", (PyCFunction)between, METH_VARARGS,
+        PyDoc_STR("between ADD Documentation")},
     {NULL,              NULL}           /* sentinel */
 };
 

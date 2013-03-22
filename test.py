@@ -71,7 +71,7 @@ class TestLazySorted(unittest.TestCase):
                     b = random.randrange(-n, n + 1)
                     c = random.randrange(1, n + 3) * random.choice([-1, 1])
                     self.assertEqual(ls[a:b:c], ys[a:b:c], msg="xs = %s; "
-                                     "called xs[%d:%d:%d]" % (xs, a, b, c))
+                                     "called ls[%d:%d:%d]" % (xs, a, b, c))
 
     def test_step(self):
         steps = [-64, -16, -2, -1, 1, 2, 16, 64]
@@ -84,6 +84,24 @@ class TestLazySorted(unittest.TestCase):
                 random.shuffle(steps)
                 for step in steps:
                     self.assertEqual(ls[::step], ys[::step])
+
+    def test_between(self):
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(n)
+            for rep in xrange(100):
+                a = random.randrange(-n, n + 1)
+                b = random.randrange(-n, n + 1)
+
+                random.shuffle(xs)
+                ls = LazySorted(xs)
+                between = ls.between(a, b)
+
+                self.assertEqual(len(between), len(ys[a:b]), msg="n = %d; "
+                                 "called ls.between(%d, %d)" % (n, a, b))
+                self.assertEqual(set(between), set(ys[a:b]), msg="n = %d; "
+                                 "called ls.between(%d, %d)" % (n, a, b))
+
 
 if __name__ == "__main__":
     unittest.main()
