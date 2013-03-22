@@ -22,7 +22,7 @@ class TestLazySorted(unittest.TestCase):
         for n in xrange(1, 64):
             xs = range(n)
             for k in xrange(1, n):
-                for rep in xrange(1, 10):
+                for rep in xrange(10):
                     random.shuffle(xs)
                     self.assertEqual(LazySorted(xs)[k], k,
                                      msg="xs = %s; k = %d" % (xs, k))
@@ -31,7 +31,7 @@ class TestLazySorted(unittest.TestCase):
         for n in xrange(1, 64):
             xs = range(n)
             ks = 2 * range(n)  # include multiple accesses
-            for rep in xrange(1, 10):
+            for rep in xrange(10):
                 random.shuffle(xs)
                 random.shuffle(ks)
                 ls = LazySorted(xs)
@@ -47,17 +47,43 @@ class TestLazySorted(unittest.TestCase):
             self.assertEqual(ls.__len__(), n)
 
     def test_select_range(self):
-        for n in xrange(1, 128):
+        for n in xrange(128):
             xs = range(n)
-            for list_rep in xrange(1, 5):
+            for list_rep in xrange(5):
                 random.shuffle(xs)
                 ls = LazySorted(xs)
                 for select_rep in xrange(128):
-                    a, b = random.randrange(n), random.randrange(n)
+                    a, b = random.randrange(n + 1), random.randrange(n + 1)
                     a, b = min(a, b), max(a, b)
                     self.assertEqual(ls[a:b], range(a, b), msg="xs = %s; "
                                      "(a, b) = (%d, %d); select_rep = %d" %
                                      (xs, a, b, select_rep))
+
+    def test_full_range(self):
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(n)
+            for list_rep in xrange(5):
+                random.shuffle(xs)
+                ls = LazySorted(xs)
+                for select_rep in xrange(128):
+                    a = random.randrange(-n, n + 1)
+                    b = random.randrange(-n, n + 1)
+                    c = random.randrange(1, n + 3) * random.choice([-1, 1])
+                    self.assertEqual(ls[a:b:c], ys[a:b:c], msg="xs = %s; "
+                                     "called xs[%d:%d:%d]" % (xs, a, b, c))
+
+    def test_step(self):
+        steps = [-64, -16, -2, -1, 1, 2, 16, 64]
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(n)
+            for list_rep in xrange(5):
+                random.shuffle(xs)
+                ls = LazySorted(xs)
+                random.shuffle(steps)
+                for step in steps:
+                    self.assertEqual(ls[::step], ys[::step])
 
 if __name__ == "__main__":
     unittest.main()

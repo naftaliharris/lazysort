@@ -210,13 +210,13 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
     return node;
 }
 
-/* Takes two trees and merges them into one while preserving the treap 
+/* Takes two trees and merges them into one while preserving the treap
  * invariant. left must have a smaller index than right. */
 static PivotNode *
 merge_trees(PivotNode *left, PivotNode *right)
 {
     assert(left != NULL || right != NULL);
-    
+
     if (left == NULL)
         return right;
     if (right == NULL)
@@ -247,7 +247,7 @@ static void
 delete_node(PivotNode *node, PivotNode **root)
 {
     assert_tree(*root);
-    
+
     if (node->left == NULL) {
         /* node has at most one child in node->right, so we just have the 
          * grandparent adopt it, if node is not the root. If node is the root,
@@ -295,7 +295,7 @@ delete_node(PivotNode *node, PivotNode **root)
             /* The hard case: node has two children. We merge the two children
              * into one treap, and then replace node by this treap */
             PivotNode *children = merge_trees(node->left, node->right);
-            
+
             if (node->parent != NULL) {
                 if (node->parent->left == node) {
                     node->parent->left = children;
@@ -325,7 +325,7 @@ depivot(PivotNode *left, PivotNode *right, PivotNode **root)
     assert_tree(*root);
     assert(left->flags & SORTED_LEFT);
     assert(right->flags & SORTED_RIGHT);
-    
+
     if (left->flags & SORTED_RIGHT) {
         delete_node(left, root);
     }
@@ -380,7 +380,7 @@ free_tree(PivotNode *root)
 }
 
 /* The LazySorted object */
- 
+
 typedef struct {
     PyObject_HEAD
     PyListObject        *xs;            /* Partially sorted list */
@@ -631,63 +631,33 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
 static PyObject *indexerr = NULL;
 
 static PyObject *
-ls_item(LSObject *ls, Py_ssize_t k)
-{
-    /* TODO: Really consider moving this to ls_subscript */
-
-    Py_ssize_t xs_len = Py_SIZE(ls->xs);
-
-    if (k < 0 || k >= xs_len) {
-        if (indexerr == NULL) {
-            indexerr = PyString_FromString(
-                "list index out of range");
-            if (indexerr == NULL)
-                return NULL;
-        }
-        PyErr_SetObject(PyExc_IndexError, indexerr);
-        return NULL;
-    }
-
-    if (sort_point(ls, k) < 0)
-        return NULL;
-
-    Py_INCREF(ls->xs->ob_item[k]);
-    return ls->xs->ob_item[k];
-}
-
-/* Returns the list of sorted objects between start and stop */
-static PyListObject *
-ls_slice(LSObject* ls, Py_ssize_t start, Py_ssize_t stop)
-{
-    /* TODO: Really consider moving this to ls_subscript */
-
-    if (sort_range(ls, start, stop) < 0)
-        return NULL;
-
-    PyListObject *result = (PyListObject *)PyList_New(stop - start);
-    if (result == NULL)
-        return NULL;
-
-    Py_ssize_t i;
-    for (i = start; i < stop; i++) {
-        Py_INCREF(ls->xs->ob_item[i]);
-        result->ob_item[i - start] = ls->xs->ob_item[i];
-    }
-
-    return result;
-}
-
-static PyObject *
 ls_subscript(LSObject* self, PyObject* item)
 {
+    Py_ssize_t xs_len = Py_SIZE(self->xs);
+
     if (PyIndex_Check(item)) {
         Py_ssize_t k;
         k = PyNumber_AsSsize_t(item, PyExc_IndexError);
         if (k == -1 && PyErr_Occurred())
             return NULL;
         if (k < 0)
-            k += PyList_GET_SIZE(self->xs);
-        return ls_item(self, k);
+            k += xs_len;
+
+        if (k < 0 || k >= xs_len) {
+            if (indexerr == NULL) {
+                indexerr = PyString_FromString("list index out of range");
+                if (indexerr == NULL)
+                    return NULL;
+            }
+            PyErr_SetObject(PyExc_IndexError, indexerr);
+            return NULL;
+        }
+
+        if (sort_point(self, k) < 0)
+            return NULL;
+
+        Py_INCREF(self->xs->ob_item[k]);
+        return self->xs->ob_item[k];
     }
     else if (PySlice_Check(item)) {
         Py_ssize_t start, stop, step, slicelength;
@@ -700,11 +670,44 @@ ls_subscript(LSObject* self, PyObject* item)
         if (slicelength <= 0) {
             return PyList_New(0);
         }
-        else if (step == 1) {
-            return (PyObject *)ls_slice(self, start, stop);
+        else if (-CONTIG_THRESH <= step && step <= CONTIG_THRESH) {
+            Py_ssize_t left = start < stop ? start : stop;
+            Py_ssize_t right = start < stop ? stop : start;
+
+            if (step < 0) {
+                left++;
+                right++;
+            }
+
+            if (sort_range(self, left, right) < 0)
+                return NULL;
+
+            PyListObject *result = (PyListObject *)PyList_New(slicelength);
+            if (result == NULL)
+                return NULL;
+
+            Py_ssize_t k, j;
+            for (k = start, j = 0; j < slicelength; k += step, j++) {
+                Py_INCREF(self->xs->ob_item[k]);
+                result->ob_item[j] = self->xs->ob_item[k];
+            }
+
+            return (PyObject *)result;
         }
         else {
-            assert(0); /* TODO Implement this */
+            PyListObject *result = (PyListObject *)PyList_New(slicelength);
+            if (result == NULL)
+                return NULL;
+
+            Py_ssize_t k, j;
+            for (k = start, j = 0; j < slicelength; k += step, j++) {
+                if (sort_point(self, k) < 0)
+                    return NULL;
+                Py_INCREF(self->xs->ob_item[k]);
+                result->ob_item[j] = self->xs->ob_item[k];
+            }
+
+            return (PyObject *)result;
         }
     }
     else {
