@@ -438,7 +438,7 @@ partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
     PyObject *tmp;  /* Used by SWAP macro */
     PyObject *pivot;
-    Py_ssize_t ltflag;
+    int ltflag;
 
     Py_ssize_t pivot_index = pick_pivot(ob_item, left, right);
     pivot = ob_item[pivot_index];
@@ -625,6 +625,100 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
     return 0;
 }
 
+/* Returns the first index of item in the list, or -2 on error, or -1 if item
+ * is not present */
+static Py_ssize_t
+find_item(LSObject *ls, PyObject *item)
+{
+    PivotNode *left = NULL;
+    PivotNode *right = NULL;
+    PivotNode *current = ls->root;
+    int ltflag;
+    Py_ssize_t xs_len = Py_SIZE(ls->xs);
+    Py_ssize_t left_index, right_index;
+
+    while (current != NULL) {
+        if (current->index == -1) {
+            left = current;
+            current = current->right;
+        }
+        else if (current->index == xs_len) {
+            right = current;
+            current = current->left;
+        }
+        else {
+            IFLT(ls->xs->ob_item[current->index], item) {
+                left = current;
+                current = current->right;
+            }
+            else {
+                right = current;
+                current = current->left;
+            }
+        }
+    }
+
+    if (left->flags & SORTED_LEFT) {
+        assert(right->flags & SORTED_RIGHT);
+        left_index = left->index + 1;
+        right_index = right->index == xs_len ? xs_len : right->index + 1;
+    }
+    else {
+        Py_ssize_t pivot_index;
+        while (left->index + 1 + SORT_THRESH <= right->index) {
+            pivot_index = partition(ls->xs->ob_item, left->index + 1,
+                                    right->index);
+            IFLT(ls->xs->ob_item[pivot_index], item) {
+                if (left->right == NULL) {
+                    left = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+                }
+                else {
+                    left = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+                }
+                if (left == NULL)
+                    return -2;
+            }
+            else {
+                if (left->right == NULL) {
+                    right = insert_pivot(pivot_index, UNSORTED, &ls->root, left);
+                }
+                else {
+                    right = insert_pivot(pivot_index, UNSORTED, &ls->root, right);
+                }
+                if (right == NULL)
+                    return -2;
+            }
+        }
+
+        left_index = left->index + 1;
+        right_index = right->index == xs_len ? xs_len : right->index + 1;
+
+        insertion_sort(ls->xs->ob_item, left->index + 1, right->index);
+        left->flags |= SORTED_LEFT;
+        right->flags |= SORTED_RIGHT;
+        depivot(left, right, &ls->root);
+    }
+
+    /* TODO: Do binary search now */
+    Py_ssize_t k;
+    int cmp = 0;
+    for (k = left_index; cmp == 0 && k < right_index; k++) {
+        cmp = PyObject_RichCompareBool(item, ls->xs->ob_item[k], Py_EQ);
+    }
+
+    if (cmp < 0) {
+        return -2;
+    }
+    else if (cmp == 0) {
+        return -1;
+    }
+    else {
+        return k - 1;  /* -1 since incremented in for loop */
+    }
+
+fail:
+    return -2;
+}
 
 /* LazySorted methods */
 
@@ -765,6 +859,53 @@ between(LSObject *self, PyObject *args)
     return (PyObject *)result;
 }
 
+static PyObject *
+ls_index(LSObject *self, PyObject *args)
+{
+    PyObject *item;
+    if (!PyArg_ParseTuple(args, "O:list", &item))
+        return NULL;
+
+    Py_ssize_t index = find_item(self, item);
+    if (index == -2) {
+        return NULL;
+    }
+    else if (index == -1) {
+        PyObject *err_format, *err_string, *format_tuple;
+        err_format = PyString_FromString("%r is not in list");
+        if (err_format == NULL)
+            return NULL;
+        format_tuple = PyTuple_Pack(1, item);
+        if (format_tuple == NULL)
+            return NULL;
+        err_string = PyString_Format(err_format, format_tuple);
+        Py_DECREF(format_tuple);
+        if (err_string == NULL)
+            return NULL;
+        PyErr_SetObject(PyExc_ValueError, err_string);
+        Py_DECREF(err_string);
+        return NULL;
+    }
+    else {
+        return PyInt_FromSsize_t(index);
+    }
+}
+
+static int
+ls_contains(LSObject *self, PyObject *item)
+{
+    Py_ssize_t index = find_item(self, item);
+    if (index == -2) {
+        return -1;
+    }
+    else if (index == -1) {
+        return 0;
+    }
+    else {
+        return 1;
+    }
+}
+
 static Py_ssize_t
 ls_length(LSObject *self)
 {
@@ -779,12 +920,59 @@ LS_dealloc(LSObject *self)
     PyObject_Del(self);
 }
 
+/* TODO: This documentation sucks */
 static PyMethodDef LS_methods[] = {
     {"__getitem__", (PyCFunction)ls_subscript, METH_O|METH_COEXIST,
-        PyDoc_STR("__getitem__ ADD Documentation")},
+        PyDoc_STR(
+"__getitem__ allows you to access items from the LazySorted instance. It is\n"
+"equivalent to the subscript notation, ie, LS.__getitem__(x) is the same\n"
+"thing as LS[x], where x is integer or slice object.\n"
+"When __getitem__ is called, it sorts the internal list only enough so that\n"
+"it can get your query, and then returns it.\n"
+"\n"
+"Examples:\n"
+"    >>> xs = range(100)\n"
+"    >>> random.shuffle(xs)\n"
+"    >>> ls = LazySorted(xs)\n"
+"    >>> ls[26]\n"
+"    26\n"
+"    >>> ls[5:10]\n"
+"    [5, 6, 7, 8, 9]\n"
+"    >>> ls[::20]\n"
+"    [0, 20, 40, 60, 80]"
+)},
     {"between", (PyCFunction)between, METH_VARARGS,
-        PyDoc_STR("between ADD Documentation")},
+        PyDoc_STR(
+"between allows you to access all points that are between particular\n"
+"indices. The order of the points it returns, however, is undefined. This is\n"
+"useful if you want to throw away outliers in some data set, for example.\n"
+"\n"
+"Examples:\n\n"
+"    >>> xs = range(100)\n"
+"    >>> random.shuffle(xs)\n"
+"    >>> ls = LazySorted(xs)\n"
+"    >>> set(ls.between(5, 95)) == set(range(5, 95))\n"
+"    True"
+)},
+    {"index", (PyCFunction)ls_index, METH_VARARGS,
+        PyDoc_STR(
+"Returns the index of item in the list, or raises a ValueError if it isn't\n"
+"present"
+)},
     {NULL,              NULL}           /* sentinel */
+};
+
+static PySequenceMethods ls_as_sequence = {
+    (lenfunc)ls_length,                         /* sq_length */
+    0,                                          /* sq_concat */
+    0,                                          /* sq_repeat */
+    0,                                          /* sq_item */
+    0,                                          /* sq_slice */
+    0,                                          /* sq_ass_item */
+    0,                                          /* sq_ass_slice */
+    (objobjproc)ls_contains,                    /* sq_contains */
+    0,                                          /* sq_inplace_concat */
+    0,                                          /* sq_inplace_repeat */
 };
 
 static PyMappingMethods ls_as_mapping = {
@@ -827,7 +1015,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_compare*/
     0,                      /*tp_repr*/
     0,                      /*tp_as_number*/
-    0,                      /*tp_as_sequence*/
+    &ls_as_sequence,        /*tp_as_sequence*/
     &ls_as_mapping,         /*tp_as_mapping*/
     0,                      /*tp_hash*/
     0,                      /*tp_call*/
@@ -867,7 +1055,8 @@ static PyMethodDef ls_methods[] = {
 };
 
 PyDoc_STRVAR(module_doc,
-"TODO: Add module docs...");
+"TODO: Add module docs..."
+);
 
 /* Initialization function for the module */
 

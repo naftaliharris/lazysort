@@ -3,6 +3,7 @@
 import unittest
 import random
 import lazysorted
+import doctest
 from lazysorted import LazySorted
 
 
@@ -101,6 +102,28 @@ class TestLazySorted(unittest.TestCase):
                                  "called ls.between(%d, %d)" % (n, a, b))
                 self.assertEqual(set(between), set(ys[a:b]), msg="n = %d; "
                                  "called ls.between(%d, %d)" % (n, a, b))
+
+    def test_README(self):
+        failures, tests = doctest.testfile('README.md')
+        self.assertEqual(failures, 0)
+
+    def test_contains(self):
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
+            for rep in xrange(20):
+                random.shuffle(xs)
+                random.shuffle(ys)
+
+                ls = LazySorted(xs)
+                for y in ys:
+                    self.assertEqual(y in xs, y in ls, msg="ys = %s; xs = %s" %
+                                     (ys, xs))
+
+                ls = LazySorted(xs)
+                for y in ys:
+                    self.assertEqual(xs.__contains__(y), ls.__contains__(y),
+                                     msg="ys = %s; xs = %s" % (ys, xs))
 
 
 if __name__ == "__main__":
