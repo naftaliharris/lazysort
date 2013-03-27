@@ -125,6 +125,52 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEqual(xs.__contains__(y), ls.__contains__(y),
                                      msg="ys = %s; xs = %s" % (ys, xs))
 
+    def test_simple_index(self):
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(n)
+            for rep in xrange(5):
+                random.shuffle(xs)
+                random.shuffle(ys)
+                ls = LazySorted(xs)
+
+                for y in ys:
+                    self.assertEqual(ls.index(y), y)
+
+    def test_index_valueerror(self):
+        for n in xrange(128):
+            xs = range(n)
+            for rep in xrange(5):
+                random.shuffle(xs)
+                ls = LazySorted(xs)
+
+                with self.assertRaises(ValueError):
+                    ls.index(-1)
+
+                with self.assertRaises(ValueError):
+                    ls.index(n)
+
+                with self.assertRaises(ValueError):
+                    ls.index(5.5)
+
+    def test_index_nonunique(self):
+        for a in xrange(1, 32):
+            for b in xrange(1, 32):
+                xs = a * ["a"] + b * ["b"]
+                for rep in xrange(3):
+                    random.shuffle(xs)
+                    ls = LazySorted(xs)
+
+                    self.assertEquals(ls.index("b"), a)
+                    self.assertEquals(ls.index("a"), 0)
+
+                for rep in xrange(3):
+                    random.shuffle(xs)
+                    ls = LazySorted(xs)
+
+                    self.assertEquals(ls.index("a"), 0)
+                    self.assertEquals(ls.index("b"), a)
+
 
 if __name__ == "__main__":
     unittest.main()
