@@ -23,6 +23,7 @@ typedef struct PivotNode {
 #define SORTED_RIGHT 1
 #define SORTED_LEFT 2
 #define UNSORTED 0
+#define SORTED_BOTH 3
 
 /* The LazySorted object */
 typedef struct {
@@ -582,7 +583,7 @@ sort_point(LSObject *ls, Py_ssize_t k)
             if (middle == NULL)
                 return -1;
 
-            uniq_pivots(left, middle, right, ls);
+            if (uniq_pivots(left, middle, right, ls) < 0) return -1;
             left = middle;
         }
         else if (piv_idx > k) {
@@ -595,7 +596,7 @@ sort_point(LSObject *ls, Py_ssize_t k)
             if (middle == NULL)
                 return -1;
 
-            uniq_pivots(left, middle, right, ls);
+            if (uniq_pivots(left, middle, right, ls) < 0) return -1;
             right = middle;
         }
         else {
@@ -606,7 +607,7 @@ sort_point(LSObject *ls, Py_ssize_t k)
                 middle = insert_pivot(piv_idx, UNSORTED, &ls->root, right);
             }
 
-            uniq_pivots(left, middle, right, ls);
+            if (uniq_pivots(left, middle, right, ls) < 0) return -1;
             return 0;
         }
     }
@@ -728,7 +729,7 @@ find_item(LSObject *ls, PyObject *item)
                 if (middle == NULL)
                     return -2;
 
-                uniq_pivots(left, middle, right, ls);
+                if (uniq_pivots(left, middle, right, ls) < 0) return -1;
                 left = middle;
             }
             else {
@@ -741,7 +742,7 @@ find_item(LSObject *ls, PyObject *item)
                 if (middle == NULL)
                     return -2;
 
-                uniq_pivots(left, middle, right, ls);
+                if (uniq_pivots(left, middle, right, ls) < 0) return -1;
                 right = middle;
             }
         }
@@ -1000,6 +1001,53 @@ ls_contains(LSObject *self, PyObject *item)
     }
 }
 
+static PyObject *
+ls_pivots(LSObject *self)
+{
+    PyObject *result = PyList_New(0);
+    if (result == NULL) 
+        return NULL;
+
+    PyObject *unsorted = PyString_FromString("UNSORTED");
+    if (unsorted == NULL)
+        return NULL;
+    PyObject *sortedright = PyString_FromString("SORTED_RIGHT");
+    if (sortedright == NULL)
+        return NULL;
+    PyObject *sortedleft = PyString_FromString("SORTED_LEFT");
+    if (sortedleft == NULL)
+        return NULL;
+    PyObject *sortedboth = PyString_FromString("SORTED_BOTH");
+    if (sortedboth == NULL)
+        return NULL;
+
+    PyObject *flags[4] = {unsorted, sortedright, sortedleft, sortedboth};
+
+    PivotNode *curr = self->root;
+    while (curr->left != NULL)
+        curr = curr->left;
+
+    Py_ssize_t i;
+    PyObject *index;
+    PyObject *tuple;
+    for (i = 0; curr != NULL; i++, curr = next_pivot(curr)) {
+        index = PyInt_FromSsize_t(curr->index);
+        if (index == NULL) {
+            Py_DECREF(result);
+            return NULL;
+        }
+        tuple = PyTuple_Pack(2, index, flags[curr->flags]);
+        if (tuple == NULL) {
+            Py_DECREF(index);
+            Py_DECREF(result);
+            return NULL;
+        }
+        PyList_Append(result, tuple);
+    }
+
+    return (PyObject*)result;
+}
+
 static Py_ssize_t
 ls_length(LSObject *self)
 {
@@ -1057,7 +1105,10 @@ static PyMethodDef LS_methods[] = {
         PyDoc_STR(
 "Returns the number of times the item appears in the list"
 )},
-
+    {"_pivots", (PyCFunction)ls_pivots, METH_NOARGS,
+        PyDoc_STR(
+"Returns the list of pivot indices, for debugging"
+)},
     {NULL,              NULL}           /* sentinel */
 };
 
