@@ -19,7 +19,7 @@ In short, you can use LazySorted the same way you use the sorted(.) function:
     [497, 498, 499, 500, 501, 502]
     >>> xs_sorted[999]
     999
-    >>> "foo" in xs_sorted
+    >>> -1 in xs_sorted
     False
 
 LazySorted objects have a few extra methods, however: (unsorted data between
@@ -62,13 +62,19 @@ Things you should not use lazysorted for
 Installation
 ------------
 
-You can install lazysorted with
+lazysorted requires the python headers, (Python.h). I believe they ship with
+OSX, but if you don't have them they can be installed on a debian-like system
+with
+    
+    $ sudo apt-get install python-dev
+
+Then you can install lazysorted with
 
     $ sudo python setup.py install
 
 
-Testing
--------
+Testing and Performance
+-----------------------
 
 I've put in a fair bit of effort to test that lazysorted actually does what
 it's supposed to. You can test it yourself (after installing it) with
@@ -76,16 +82,8 @@ it's supposed to. You can test it yourself (after installing it) with
     $ python test.py
 
 
-Performance
------------
+Blah blah benchmarks
 
-Insert benchmark comparisons to sorted
-
-
-Performance Tuning
-------------------
-
-...
 
 FAQ
 ---
@@ -99,7 +97,7 @@ And LazySorted is empirically faster.
 + How is lazysorted licensed?
 
 lazysorted is BSD licensed. So you can use it pretty much however you like!
-See LICENSE for more details.
+See LICENSE for details.
 
 
 Email me!

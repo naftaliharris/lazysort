@@ -171,6 +171,40 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEquals(ls.index("a"), 0)
                     self.assertEquals(ls.index("b"), a)
 
+    def test_count_nonunique(self):
+        for a in xrange(1, 32):
+            for b in xrange(1, 32):
+                xs = a * ["a"] + b * ["b"]
+                for rep in xrange(3):
+                    random.shuffle(xs)
+                    ls = LazySorted(xs)
+
+                    self.assertEquals(ls.count("b"), b,
+                                      msg=ls.between(0, a + b))
+                    self.assertEquals(ls.count("a"), a,
+                                      msg=ls.between(0, a + b))
+
+                for rep in xrange(3):
+                    random.shuffle(xs)
+                    ls = LazySorted(xs)
+
+                    self.assertEquals(ls.count("a"), a,
+                                      msg=ls.between(0, a + b))
+                    self.assertEquals(ls.count("b"), b,
+                                      msg=ls.between(0, a + b))
+
+    def test_count_simple(self):
+        for n in xrange(128):
+            xs = range(n)
+            ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
+            for rep in xrange(5):
+                random.shuffle(xs)
+                random.shuffle(ys)
+                ls = LazySorted(xs)
+                for y in ys:
+                    self.assertEqual(ls.count(y), 1 if (isinstance(y, int) and
+                                     0 <= y < n) else 0)
+
 
 if __name__ == "__main__":
     unittest.main()
