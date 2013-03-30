@@ -180,18 +180,22 @@ class TestLazySorted(unittest.TestCase):
                     ls = LazySorted(xs)
 
                     self.assertEquals(ls.count("b"), b,
-                                      msg=ls.between(0, a + b))
+                                      msg=str(ls.between(0, a + b)) + "\n" +
+                                          str(ls._pivots()) + "\n" + str(xs))
                     self.assertEquals(ls.count("a"), a,
-                                      msg=ls.between(0, a + b))
+                                      msg=str(ls.between(0, a + b)) + "\n" +
+                                          str(ls._pivots()) + "\n" + str(xs))
 
                 for rep in xrange(3):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
                     self.assertEquals(ls.count("a"), a,
-                                      msg=ls.between(0, a + b))
+                                      msg=str(ls.between(0, a + b)) + "\n" +
+                                          str(ls._pivots()) + "\n" + str(xs))
                     self.assertEquals(ls.count("b"), b,
-                                      msg=ls.between(0, a + b))
+                                      msg=str(ls.between(0, a + b)) + "\n" +
+                                          str(ls._pivots()) + "\n" + str(xs))
 
     def test_count_simple(self):
         for n in xrange(128):

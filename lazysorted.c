@@ -10,7 +10,7 @@
  * application. */
 
 typedef struct PivotNode {
-    Py_ssize_t index;
+    Py_ssize_t idx;
     int flags;
     int priority;
     struct PivotNode *left;
@@ -48,7 +48,7 @@ next_pivot(PivotNode *current)
         }
     }
     else {
-        while (curr->parent != NULL && curr->parent->index < curr->index) {
+        while (curr->parent != NULL && curr->parent->idx < curr->idx) {
             curr = curr->parent;
         }
 
@@ -60,7 +60,7 @@ next_pivot(PivotNode *current)
         }
     }
 
-    assert(curr->index > current->index);
+    assert(curr->idx > current->idx);
     return curr;
 }
 
@@ -72,13 +72,13 @@ static void
 assert_node(PivotNode *node)
 {
     if (node->left != NULL) {
-        assert(node->left->index < node->index);
+        assert(node->left->idx < node->idx);
         assert(node->left->priority <= node->priority);
         assert(node->left->parent == node);
         assert_node(node->left);
     }
     if (node->right != NULL) {
-        assert(node->right->index > node->index);
+        assert(node->right->idx > node->idx);
         assert(node->right->priority <= node->priority);
         assert(node->right->parent == node);
         assert_node(node->right);
@@ -123,7 +123,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
     PivotNode *node = (PivotNode *)PyMem_Malloc(sizeof(PivotNode));
     if (node == NULL)
         return (PivotNode *)PyErr_NoMemory();
-    node->index = k;
+    node->idx = k;
     node->flags = flags;
     node->priority = rand(); /* XXX Security, thread-safety */
     node->left = NULL;
@@ -139,7 +139,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
     /* Put the node in it's sorted order */
     PivotNode *current = start;
     while (1) {
-        if (current->index < k) {
+        if (current->idx < k) {
             if (current->right == NULL) {
                 current->right = node;
                 node->parent = current;
@@ -147,7 +147,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
             }
             current = current->right;
         }
-        else if (current->index > k) {
+        else if (current->idx > k) {
             if (current->left == NULL) {
                 current->left = node;
                 node->parent = current;
@@ -174,7 +174,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
          *         \                   /
          *       (child)            (child)
          */
-        if (node->index < node->parent->index) {
+        if (node->idx < node->parent->idx) {
             child = node->right;
             parent = node->parent;
             grandparent = parent->parent;
@@ -210,7 +210,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
 
         /* Adjust node->parent's child pointer to point to node */
         if (node->parent != NULL) {
-            if (k < node->parent->index) {
+            if (k < node->parent->idx) {
                 node->parent->left = node;
             }
             else {
@@ -241,7 +241,7 @@ merge_trees(PivotNode *left, PivotNode *right)
         return left;
 
     assert(left->parent == right->parent);
-    assert(left->index < right->index);
+    assert(left->idx < right->idx);
     assert_node(left);
     assert_node(right);
 
@@ -365,12 +365,12 @@ uniq_pivots(PivotNode *left, PivotNode *middle, PivotNode *right, LSObject *ls)
 {
     assert_tree(ls->root);
     assert_tree_flags(ls->root);
-    assert(left->index < middle->index && middle->index < right->index);
+    assert(left->idx < middle->idx && middle->idx < right->idx);
     int cmp;
 
-    if (left->index >= 0) {
-        if ((cmp = PyObject_RichCompareBool(ls->xs->ob_item[left->index],
-                                            ls->xs->ob_item[middle->index],
+    if (left->idx >= 0) {
+        if ((cmp = PyObject_RichCompareBool(ls->xs->ob_item[left->idx],
+                                            ls->xs->ob_item[middle->idx],
                                             Py_EQ)) < 0) {
             return -1;
         }
@@ -380,9 +380,9 @@ uniq_pivots(PivotNode *left, PivotNode *middle, PivotNode *right, LSObject *ls)
         }
     }
 
-    if (right->index < Py_SIZE(ls->xs)) {
-        if ((cmp = PyObject_RichCompareBool(ls->xs->ob_item[middle->index],
-                                            ls->xs->ob_item[right->index],
+    if (right->idx < Py_SIZE(ls->xs)) {
+        if ((cmp = PyObject_RichCompareBool(ls->xs->ob_item[middle->idx],
+                                            ls->xs->ob_item[right->idx],
                                             Py_EQ)) < 0) {
             return -1;
         }
@@ -400,7 +400,7 @@ uniq_pivots(PivotNode *left, PivotNode *middle, PivotNode *right, LSObject *ls)
 /* Finds PivotNodes left and right that bound the index */
 /* Never returns k in right_node, only the left, if applicable */
 static void
-bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
+bound_idx(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
 {
     assert_tree(root);
     assert_tree_flags(root);
@@ -409,11 +409,11 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
     *right = NULL;
     PivotNode *current = root;
     while (current != NULL) {
-        if (current->index < k) {
+        if (current->idx < k) {
             *left = current;
             current = current->right;
         }
-        else if (current->index > k) {
+        else if (current->idx > k) {
             *right = current;
             current = current->left;
         }
@@ -423,8 +423,8 @@ bound_index(Py_ssize_t k, PivotNode *root, PivotNode **left, PivotNode **right)
         }
     }
 
-    assert(*left != NULL && ((*left)->index == k || *right != NULL));
-    assert((*left)->index == k || *right == next_pivot(*left));
+    assert(*left != NULL && ((*left)->idx == k || *right != NULL));
+    assert((*left)->idx == k || *right == next_pivot(*left));
 }
 
 static void
@@ -480,8 +480,9 @@ pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
     return left + rand() % (right - left);
 }
 
-/* Partitions the data between left and right and returns the pivot index,
- * or -1 on error */
+/* Partitions the data between left and right into
+ * [less than region | greater or equal to region]
+ * and returns the pivot index, or -1 on error */
 static Py_ssize_t
 partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
@@ -558,21 +559,21 @@ sort_point(LSObject *ls, Py_ssize_t k)
 {
     /* Find the best possible bounds */
     PivotNode *left, *right, *middle;
-    bound_index(k, ls->root, &left, &right);
+    bound_idx(k, ls->root, &left, &right);
 
-    /* bound_index never returns k in right, but right might be NULL if
-     * left->index == k, so check left->index first. */
-    if (left->index == k || right->flags & SORTED_RIGHT) {
+    /* bound_idx never returns k in right, but right might be NULL if
+     * left->idx == k, so check left->idx first. */
+    if (left->idx == k || right->flags & SORTED_RIGHT) {
         return 0;
     }
 
     /* Run quickselect */
     Py_ssize_t piv_idx;
 
-    while (left->index + 1 + SORT_THRESH <= right->index) {
+    while (left->idx + 1 + SORT_THRESH <= right->idx) {
         piv_idx = partition(ls->xs->ob_item,
-                                left->index + 1,
-                                right->index);
+                                left->idx + 1,
+                                right->idx);
         if (piv_idx < k) {
             if (left->right == NULL) {
                 middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -612,7 +613,7 @@ sort_point(LSObject *ls, Py_ssize_t k)
         }
     }
 
-    insertion_sort(ls->xs->ob_item, left->index + 1, right->index);
+    insertion_sort(ls->xs->ob_item, left->idx + 1, right->idx);
     left->flags |= SORTED_LEFT;
     right->flags |= SORTED_RIGHT;
     depivot(left, right, &ls->root);
@@ -643,18 +644,18 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
         return -1;
 
     PivotNode *current, *next;
-    bound_index(start, ls->root, &current, &next);
-    if (current->index == start)
+    bound_idx(start, ls->root, &current, &next);
+    if (current->idx == start)
         next = next_pivot(current);
 
-    while (current->index < stop) {
+    while (current->idx < stop) {
         if (current->flags & SORTED_LEFT) {
             assert(next->flags & SORTED_RIGHT);
         }
         else {
             /* Since we are sorting the entire region, we don't need to keep
              * track of pivots, and so we can use vanilla quicksort */
-            quick_sort(ls->xs->ob_item, current->index + 1, next->index);
+            quick_sort(ls->xs->ob_item, current->idx + 1, next->idx);
             current->flags |= SORTED_LEFT;
             next->flags |= SORTED_RIGHT;
         }
@@ -676,7 +677,12 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
 }
 
 /* Returns the first index of item in the list, or -2 on error, or -1 if item
- * is not present */
+ * is not present. Places item in that first idx, but makes no guarantees
+ * any duplicate versions of item will immediately follow. Eg, it's possible
+ * calling find_item on some list with item = 1 will result in the following
+ * list:
+ * [0, 0, 0, 1, 2, 2, 1, 2, 1, 1, 2]
+ */
 static Py_ssize_t
 find_item(LSObject *ls, PyObject *item)
 {
@@ -686,19 +692,19 @@ find_item(LSObject *ls, PyObject *item)
     PivotNode *current = ls->root;
     int ltflag;
     Py_ssize_t xs_len = Py_SIZE(ls->xs);
-    Py_ssize_t left_index, right_index;
+    Py_ssize_t left_idx, right_idx;
 
     while (current != NULL) {
-        if (current->index == -1) {
+        if (current->idx == -1) {
             left = current;
             current = current->right;
         }
-        else if (current->index == xs_len) {
+        else if (current->idx == xs_len) {
             right = current;
             current = current->left;
         }
         else {
-            IFLT(ls->xs->ob_item[current->index], item) {
+            IFLT(ls->xs->ob_item[current->idx], item) {
                 left = current;
                 current = current->right;
             }
@@ -711,14 +717,14 @@ find_item(LSObject *ls, PyObject *item)
 
     if (left->flags & SORTED_LEFT) {
         assert(right->flags & SORTED_RIGHT);
-        left_index = left->index + 1;
-        right_index = right->index == xs_len ? xs_len : right->index + 1;
+        left_idx = left->idx + 1;
+        right_idx = right->idx == xs_len ? xs_len : right->idx + 1;
     }
     else {
         Py_ssize_t piv_idx;
-        while (left->index + 1 + SORT_THRESH <= right->index) {
-            piv_idx = partition(ls->xs->ob_item, left->index + 1,
-                                    right->index);
+        while (left->idx + 1 + SORT_THRESH <= right->idx) {
+            piv_idx = partition(ls->xs->ob_item, left->idx + 1,
+                                    right->idx);
             IFLT(ls->xs->ob_item[piv_idx], item) {
                 if (left->right == NULL) {
                     middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -747,10 +753,10 @@ find_item(LSObject *ls, PyObject *item)
             }
         }
 
-        left_index = left->index + 1;
-        right_index = right->index == xs_len ? xs_len : right->index + 1;
+        left_idx = left->idx + 1;
+        right_idx = right->idx == xs_len ? xs_len : right->idx + 1;
 
-        insertion_sort(ls->xs->ob_item, left->index + 1, right->index);
+        insertion_sort(ls->xs->ob_item, left->idx + 1, right->idx);
         left->flags |= SORTED_LEFT;
         right->flags |= SORTED_RIGHT;
         depivot(left, right, &ls->root);
@@ -759,7 +765,7 @@ find_item(LSObject *ls, PyObject *item)
     /* TODO: Do binary search now */
     Py_ssize_t k;
     int cmp = 0;
-    for (k = left_index; cmp == 0 && k < right_index; k++) {
+    for (k = left_idx; cmp == 0 && k < right_idx; k++) {
         cmp = PyObject_RichCompareBool(item, ls->xs->ob_item[k], Py_EQ);
     }
 
@@ -951,9 +957,6 @@ ls_index(LSObject *self, PyObject *args)
 static PyObject *
 ls_count(LSObject *self, PyObject *args)
 {
-    /* XXX doesn't work because of abaa bug:
-     * find_item returns the first index, but makes no guarantees that the
-     * rest of the items will be sorted */
     PyObject *item;
     if (!PyArg_ParseTuple(args, "O:list", &item))
         return NULL;
@@ -967,19 +970,32 @@ ls_count(LSObject *self, PyObject *args)
         return PyInt_FromSsize_t(0);
     }
     else {
-        Py_ssize_t count = 1;
-        Py_ssize_t xs_len = Py_SIZE(self->xs);
+        /* Figure out where items may be */
+        PivotNode *left, *right;
+        bound_idx(k, self->root, &left, &right);
+        if (right == NULL) {
+            right = next_pivot(left);
+        }
+
+        int xs_len = Py_SIZE(self->xs);
         int cmp;
-        for (k++; k < xs_len; k++) {
+        for (cmp = 1; right->idx < xs_len && cmp; right = next_pivot(right)) {
+            cmp = PyObject_RichCompareBool(item,
+                                           self->xs->ob_item[right->idx],
+                                           Py_EQ);
+            if (cmp < 0) {
+                return NULL;
+            }
+        }
+
+        Py_ssize_t count = 1;
+        for (k++; k < right->idx; k++) {
             cmp = PyObject_RichCompareBool(item, self->xs->ob_item[k], Py_EQ);
             if (cmp < 0) {
                 return NULL;
             }
             else if (cmp) {
                 count++;
-            }
-            else {
-                break;
             }
         }
         return PyInt_FromSsize_t(count);
@@ -989,11 +1005,11 @@ ls_count(LSObject *self, PyObject *args)
 static int
 ls_contains(LSObject *self, PyObject *item)
 {
-    Py_ssize_t index = find_item(self, item);
-    if (index == -2) {
+    Py_ssize_t idx = find_item(self, item);
+    if (idx == -2) {
         return -1;
     }
-    else if (index == -1) {
+    else if (idx == -1) {
         return 0;
     }
     else {
@@ -1031,7 +1047,7 @@ ls_pivots(LSObject *self)
     PyObject *index;
     PyObject *tuple;
     for (i = 0; curr != NULL; i++, curr = next_pivot(curr)) {
-        index = PyInt_FromSsize_t(curr->index);
+        index = PyInt_FromSsize_t(curr->idx);
         if (index == NULL) {
             Py_DECREF(result);
             return NULL;
