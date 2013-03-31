@@ -7,5 +7,5 @@ module1 = Extension('lazysorted',
 
 setup(name='lazysorted',
       version='1.0',
-      description='This is a demo package',
+      description='TODO',
       ext_modules=[module1])

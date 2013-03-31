@@ -94,6 +94,10 @@ Yes, but it's implemented by sorting the entire array and then reading off the
 requested values, not with quickselect or another O(n) selection algorithm.
 And LazySorted is empirically faster.
 
++ Doesn't the standard library have a heapq module?
+
+Yes, but that's only useful if you...
+
 + How is lazysorted licensed?
 
 lazysorted is BSD licensed. So you can use it pretty much however you like!

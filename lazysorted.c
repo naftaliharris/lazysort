@@ -10,9 +10,9 @@
  * application. */
 
 typedef struct PivotNode {
-    Py_ssize_t idx;
-    int flags;
-    int priority;
+    Py_ssize_t idx;             /* The index it represents */
+    int flags;                  /* Descriptors of the data between pivots */
+    int priority;               /* Priority in the Treap */
     struct PivotNode *left;
     struct PivotNode *right;
     struct PivotNode *parent;
@@ -988,6 +988,8 @@ ls_count(LSObject *self, PyObject *args)
             }
         }
 
+        /* TODO: do some additional sorting here to take advantage of the
+         * compares. Or refactor the code substantially or something. */
         Py_ssize_t count = 1;
         for (k++; k < right->idx; k++) {
             cmp = PyObject_RichCompareBool(item, self->xs->ob_item[k], Py_EQ);
@@ -1211,11 +1213,8 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_free*/
     0,                      /*tp_is_gc*/
 };
-/* --------------------------------------------------------------------- */
-
 
 /* List of functions defined in the module */
-
 static PyMethodDef ls_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
@@ -1225,7 +1224,6 @@ PyDoc_STRVAR(module_doc,
 );
 
 /* Initialization function for the module */
-
 PyMODINIT_FUNC
 initlazysorted(void)
 {

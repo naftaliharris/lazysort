@@ -20,6 +20,7 @@ class TestLazySorted(unittest.TestCase):
         x = LazySorted({"foo": 10, "bar": 3, "baz": 9})
 
     def test_random_select(self):
+        """Selection should work once"""
         for n in xrange(1, 64):
             xs = range(n)
             for k in xrange(1, n):
@@ -29,6 +30,7 @@ class TestLazySorted(unittest.TestCase):
                                      msg="xs = %s; k = %d" % (xs, k))
 
     def test_multiple_select(self):
+        """Selection should work many times in a row"""
         for n in xrange(1, 64):
             xs = range(n)
             ks = 2 * range(n)  # include multiple accesses
@@ -41,6 +43,7 @@ class TestLazySorted(unittest.TestCase):
                                      (xs, ks, k))
 
     def test_len(self):
+        """the __len__ method and len(.) builtin should work"""
         for n in xrange(1024):
             xs = range(n)
             ls = LazySorted(xs)
@@ -48,6 +51,7 @@ class TestLazySorted(unittest.TestCase):
             self.assertEqual(ls.__len__(), n)
 
     def test_select_range(self):
+        """selecting contiguous foward ranges should work"""
         for n in xrange(128):
             xs = range(n)
             for list_rep in xrange(5):
@@ -61,6 +65,7 @@ class TestLazySorted(unittest.TestCase):
                                      (xs, a, b, select_rep))
 
     def test_full_range(self):
+        """selecting slice objects with steps should work"""
         for n in xrange(128):
             xs = range(n)
             ys = range(n)
@@ -75,6 +80,7 @@ class TestLazySorted(unittest.TestCase):
                                      "called ls[%d:%d:%d]" % (xs, a, b, c))
 
     def test_step(self):
+        """selecting slice objects with only a step defined should work"""
         steps = [-64, -16, -2, -1, 1, 2, 16, 64]
         for n in xrange(128):
             xs = range(n)
@@ -87,6 +93,7 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEqual(ls[::step], ys[::step])
 
     def test_between(self):
+        """the between method should work"""
         for n in xrange(128):
             xs = range(n)
             ys = range(n)
@@ -104,10 +111,12 @@ class TestLazySorted(unittest.TestCase):
                                  "called ls.between(%d, %d)" % (n, a, b))
 
     def test_README(self):
+        """the examples in the README should all be correct"""
         failures, tests = doctest.testfile('README.md')
         self.assertEqual(failures, 0)
 
     def test_contains(self):
+        """The __contains__ method and `in' keyword should work"""
         for n in xrange(128):
             xs = range(n)
             ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
@@ -126,6 +135,7 @@ class TestLazySorted(unittest.TestCase):
                                      msg="ys = %s; xs = %s" % (ys, xs))
 
     def test_simple_index(self):
+        """The index method should work"""
         for n in xrange(128):
             xs = range(n)
             ys = range(n)
@@ -138,6 +148,7 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEqual(ls.index(y), y)
 
     def test_index_valueerror(self):
+        """The index method should raise a ValueError if item not in list"""
         for n in xrange(128):
             xs = range(n)
             for rep in xrange(5):
@@ -154,6 +165,7 @@ class TestLazySorted(unittest.TestCase):
                     ls.index(5.5)
 
     def test_index_nonunique(self):
+        """The index method should work in the presence of nonunique items"""
         for a in xrange(1, 32):
             for b in xrange(1, 32):
                 xs = a * ["a"] + b * ["b"]
@@ -172,6 +184,7 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEquals(ls.index("b"), a)
 
     def test_count_nonunique(self):
+        """The count method should work in the presence of nonunique items"""
         for a in xrange(1, 32):
             for b in xrange(1, 32):
                 xs = a * ["a"] + b * ["b"]
@@ -179,25 +192,18 @@ class TestLazySorted(unittest.TestCase):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.count("b"), b,
-                                      msg=str(ls.between(0, a + b)) + "\n" +
-                                          str(ls._pivots()) + "\n" + str(xs))
-                    self.assertEquals(ls.count("a"), a,
-                                      msg=str(ls.between(0, a + b)) + "\n" +
-                                          str(ls._pivots()) + "\n" + str(xs))
+                    self.assertEquals(ls.count("b"), b)
+                    self.assertEquals(ls.count("a"), a)
 
                 for rep in xrange(3):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.count("a"), a,
-                                      msg=str(ls.between(0, a + b)) + "\n" +
-                                          str(ls._pivots()) + "\n" + str(xs))
-                    self.assertEquals(ls.count("b"), b,
-                                      msg=str(ls.between(0, a + b)) + "\n" +
-                                          str(ls._pivots()) + "\n" + str(xs))
+                    self.assertEquals(ls.count("a"), a)
+                    self.assertEquals(ls.count("b"), b)
 
     def test_count_simple(self):
+        """The count method should work on simple queries"""
         for n in xrange(128):
             xs = range(n)
             ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
@@ -209,6 +215,22 @@ class TestLazySorted(unittest.TestCase):
                     self.assertEqual(ls.count(y), 1 if (isinstance(y, int) and
                                      0 <= y < n) else 0)
 
+    def test_count_manynonunique(self):
+        """The count method should work with very many nonunique items"""
+        for rep in xrange(10000):
+            items = range(random.randint(1, 50))
+            random.shuffle(items)
+            itemcounts = [random.randint(0, 16) for _ in items]
+            xs = [y for x in [[i] * itemcounts[i] for i in items] for y in x]
+
+            ls = LazySorted(xs)
+            for item in items:
+                self.assertEquals(ls.count(item), itemcounts[item])
+
+        for n in xrange(1, 128):
+            ls = LazySorted([0] * n)
+            self.assertEquals(ls.count(0), n)
+
 
 if __name__ == "__main__":
-    unittest.main()
+    unittest.main(verbosity=1)
