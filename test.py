@@ -120,7 +120,7 @@ class TestLazySorted(unittest.TestCase):
         for n in xrange(128):
             xs = range(n)
             ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
-            for rep in xrange(20):
+            for rep in xrange(10):
                 random.shuffle(xs)
                 random.shuffle(ys)
 
@@ -217,7 +217,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_count_manynonunique(self):
         """The count method should work with very many nonunique items"""
-        for rep in xrange(10000):
+        for rep in xrange(5000):
             items = range(random.randint(1, 50))
             random.shuffle(items)
             itemcounts = [random.randint(0, 16) for _ in items]
