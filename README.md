@@ -7,7 +7,7 @@ sorts as much as necessary, it can be faster than using the builtin sorted(.)
 for tasks that do not require the entire data to be sorted, like:
 
 1. Computing medians
-2. Computing truncated means, (http://en.wikipedia.org/wiki/Truncated\_mean)
+2. Computing (truncated means)[http://en.wikipedia.org/wiki/Truncated\_mean]
 3. Quickly iterating through the first few sorted elements of a list
 4. Computing the deciles or quartiles of some data
 
@@ -16,21 +16,23 @@ How to use it
 
 You can use LazySorted much the same way you use the sorted(.) function:
 
-    >>> import random
-    >>> from lazysorted import LazySorted
-    >>> xs = range(1000)
-    >>> random.shuffle(xs)
-    >>> xs_sorted = LazySorted(xs)
-    >>> xs_sorted[43]
-    43
-    >>> xs_sorted[497:503]
-    [497, 498, 499, 500, 501, 502]
-    >>> -1 in xs_sorted
-    False
-    >>> xs_sorted.index(821)
-    821
-    >>> xs_sorted.count(52)
-    1
+```python
+>>> import random
+>>> from lazysorted import LazySorted
+>>> xs = range(1000)
+>>> random.shuffle(xs)
+>>> xs_sorted = LazySorted(xs)
+>>> xs_sorted[43]
+43
+>>> xs_sorted[497:503]
+[497, 498, 499, 500, 501, 502]
+>>> -1 in xs_sorted
+False
+>>> xs_sorted.index(821)
+821
+>>> xs_sorted.count(52)
+1
+```
 
 LazySorted objects have a few extra methods, however: (unsorted data between
 intervals for alpha-trimmed mean, for example)
@@ -111,22 +113,22 @@ Blah blah benchmarks
 FAQ
 ---
 
-Doesn't numpy have a median and percentile function?
+**Doesn't numpy have a median and percentile function?**
 
 Yes, but it's implemented by sorting the entire array and then reading off the
 requested values, not with quickselect or another O(n) selection algorithm.
 And LazySorted is empirically faster, as you can see from benchmark.py
 
-Doesn't the standard library have a heapq module?
+**Doesn't the standard library have a heapq module?**
 
 Yes, but that's only useful if you're only interested in 
 
-How is lazysorted licensed?
+**How is lazysorted licensed?**
 
 lazysorted is BSD-licensed. So you can use it pretty much however you like!
 See LICENSE for details.
 
-What should I not use lazysorted for?
+**What should I not use lazysorted for?**
 
 1. Applications requiring a stable sort; the quicksort partitions make the
    order of equal elements in the sorted list undefined.
@@ -146,7 +148,17 @@ Email me!
 ---------
 
 If you use this software and feel so inclined, I'd greatly appreciate an email
-just saying that you tried it out. (My email is naftaliharris@gmail.com).
+just saying that you tried it out. My email address can be found by running
+this code:
+
+```python
+first_name = "naftali"
+last_name = "harris"
+domain = "gmail.com"
+
+print first_name + last_name + '@' + domain
+```
+
 Even something as simple as the following would be mega-awesome:
 
     Hey Naftali,
