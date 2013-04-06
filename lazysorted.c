@@ -98,6 +98,7 @@ assert_tree(PivotNode *root)
 static void
 assert_tree_flags(PivotNode *root)
 {
+#ifndef NDEBUG
     PivotNode *prev = NULL;
     PivotNode *curr = root;
     while (curr->left != NULL)
@@ -111,6 +112,7 @@ assert_tree_flags(PivotNode *root)
         prev = curr;
         curr = next_pivot(curr);
     }
+#endif
 }
 
 /* Inserts an index, returning a pointer to the node, or NULL on error.
@@ -473,11 +475,50 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
                    ob_item[i] = ob_item[j];  \
                    ob_item[j] = tmp
 
-/* Picks a pivot point among the indices left <= i < right */
+/* Picks a pivot point among the indices left <= i < right. Returns -1 on
+ * error */
 static Py_ssize_t
 pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 {
-    return left + rand() % (right - left);
+    /* Use median of three trick */
+    Py_ssize_t idx1 = left + rand() % (right - left);
+    Py_ssize_t idx2 = left + rand() % (right - left);
+    Py_ssize_t idx3 = left + rand() % (right - left);
+
+    int ltflag;
+    IFLT(ob_item[idx1], ob_item[idx3]) {
+        IFLT(ob_item[idx1], ob_item[idx2]) {
+            /* 1 2 3 vs. 1 3 2 */
+            IFLT(ob_item[idx2], ob_item[idx3]) {
+                return idx2;
+            }
+            else {
+                return idx3;
+            }
+        }
+        else {
+            /* 2 1 3 */
+            return idx1;
+        }
+    }
+    else {
+        IFLT(ob_item[idx3], ob_item[idx2]) {
+            /* 3 1 2 vs 3 2 1 */
+            IFLT(ob_item[idx1], ob_item[idx2]) {
+                return idx1;
+            }
+            else {
+                return idx2;
+            }
+        }
+        else {
+            /* 2 3 1 */
+            return idx3;
+        }
+    }
+
+fail:
+    return -1;
 }
 
 /* Partitions the data between left and right into
@@ -491,6 +532,9 @@ partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
     int ltflag;
 
     Py_ssize_t piv_idx = pick_pivot(ob_item, left, right);
+    if (piv_idx < 0) {
+        return -1;
+    }
     pivot = ob_item[piv_idx];
 
     SWAP(left, piv_idx);

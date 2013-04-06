@@ -32,6 +32,7 @@ False
 821
 >>> xs_sorted.count(52)
 1
+
 ```
 
 LazySorted objects have a few extra methods, however: (unsorted data between
@@ -70,7 +71,8 @@ partition sublist(s) as necessary and recurse into the side(s) that our data is
 in.
 
 There are also some implementation details that help lazysorted to run quickly:
-First of all, pivots elements are chosen uniformly at random, to guarantee
+First of all, pivots elements are chosen to be the median of three randomly
+elements, which makes the partition likely to be more balanced and guarantees
 average case nlog(n) behavior. Second of all, for sufficiently small lists, we
 use insertion sort instead of quicksort, which is faster on small lists. Both
 of these tricks are well-known to speed up quicksort implementations. Thirdly,
