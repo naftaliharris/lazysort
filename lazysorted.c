@@ -71,6 +71,7 @@ next_pivot(PivotNode *current)
 static void
 assert_node(PivotNode *node)
 {
+#ifndef NDEBUG
     if (node->left != NULL) {
         assert(node->left->idx < node->idx);
         assert(node->left->priority <= node->priority);
@@ -83,6 +84,7 @@ assert_node(PivotNode *node)
         assert(node->right->parent == node);
         assert_node(node->right);
     }
+#endif
 }
 
 /* A series of assert statements that the tree structure is consistent */
@@ -614,10 +616,27 @@ sort_point(LSObject *ls, Py_ssize_t k)
     /* Run quickselect */
     Py_ssize_t piv_idx;
 
+    /*
+    Py_ssize_t left_idx = left->idx;
+    Py_ssize_t right_idx = right->idx;
+    while (left_idx + 1 + SORT_THRESH <= right_idx) {
+        piv_idx = partition(ls->xs->ob_item, left_idx + 1, right_idx);
+        if (piv_idx < k) {
+            left_idx = piv_idx;
+        }
+        else if (piv_idx > k) {
+            right_idx = piv_idx;
+        }
+        else {
+            return 0;
+        }
+    }
+    insertion_sort(ls->xs->ob_item, left_idx + 1, right_idx);
+    */
+
     while (left->idx + 1 + SORT_THRESH <= right->idx) {
-        piv_idx = partition(ls->xs->ob_item,
-                                left->idx + 1,
-                                right->idx);
+        piv_idx = partition(ls->xs->ob_item, left->idx + 1, right->idx);
+        if (piv_idx < 0) return -1;
         if (piv_idx < k) {
             if (left->right == NULL) {
                 middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -651,6 +670,8 @@ sort_point(LSObject *ls, Py_ssize_t k)
             else {
                 middle = insert_pivot(piv_idx, UNSORTED, &ls->root, right);
             }
+            if (middle == NULL)
+                return -1;
 
             if (uniq_pivots(left, middle, right, ls) < 0) return -1;
             return 0;
