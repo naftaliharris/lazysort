@@ -11,9 +11,9 @@ import random
 from lazysorted import LazySorted
 
 
-def plotwtf():
+def plotwtf(algo, bigO):
     reps = 30
-    powers = np.linspace(1, 6.0, 20)
+    powers = np.linspace(1, 7.5, 50)
     ns = [int(10 ** p) + 1 for p in powers]
     times = []
 
@@ -24,17 +24,20 @@ def plotwtf():
         for rep in xrange(reps):
             random.shuffle(xs)
             t = time.time()
-            ls = LazySorted(xs)
-            ls[n//2]
+            algo(xs)
             T += (time.time() - t)
         times.append(T / reps)
 
     ns = np.array(ns)
     times = np.array(times)
+    plt.xlabel("List size (items)")
+    plt.ylabel("Compute time per item (secs / item)")
+    plt.title("Time to Compute the Median")
     plt.xscale('log')
-    plt.plot(ns, times / ns)
+    plt.plot(ns, times / bigO(ns))
     plt.show()
 
+    """
     plt.xscale('log')
     plt.yscale('log')
     plt.plot(ns, times)
@@ -45,6 +48,7 @@ def plotwtf():
     plt.show()
     print beta
     print np.var(yhat) / np.var(np.log(times))
+    """
 
 def profile():
     reps = 1000
@@ -60,4 +64,5 @@ def profile():
 
 
 if __name__ == "__main__":
-    plotwtf()
+    plotwtf(lambda xs: LazySorted(xs)[len(xs) // 2], lambda ns: ns)
+    #plotwtf(lambda xs: sorted(xs)[len(xs) // 2], lambda ns: ns * np.log(ns))
