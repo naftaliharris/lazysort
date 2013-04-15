@@ -1,13 +1,16 @@
 lazysorted
 ==========
 
+NOTE: This README is not necessarily accurate. In some places, it reflects the
+goals of this project, and not the actual state of it. To be fixed shortly.
+
 lazysorted is a Python extension module for sorting sequences lazily. It
 implements the same interface  as the builtin sorted(.) function. Since it only
 sorts as much as necessary, it can be faster than using the builtin sorted(.)
 for tasks that do not require the entire data to be sorted, like:
 
 1. Computing medians
-2. Computing (truncated means)[http://en.wikipedia.org/wiki/Truncated\_mean]
+2. Computing (truncated means)[http://en.wikipedia.org/wiki/Truncated%5Fmean]
 3. Quickly iterating through the first few sorted elements of a list
 4. Computing the deciles or quartiles of some data
 
@@ -123,7 +126,9 @@ And LazySorted is empirically faster, as you can see from benchmark.py
 
 **Doesn't the standard library have a heapq module?**
 
-Yes, but that's only useful if you're only interested in 
+Yes, but it lacks the full generality of this module. For example, you can use
+it to get the k smallest elements, (in n * log(k) time), but not k arbitrary
+contiguous elements.
 
 **How is lazysorted licensed?**
 
@@ -145,13 +150,17 @@ See LICENSE for details.
    and implemented. It also has the advantage of running faster than nlog(n)
    on lists with partial structure.
 
+**How does lazysorted work at scale?**
 
-Email me!
+Unfortunately, only okay. This turns out to be basically due to the fact that
+CPython deals with python objects by passing around pointers to them. The gory
+details can be found on (my blog)[http://www.naftaliharris.com/blog/heapobjects].
+
+Contact me!
 ---------
 
-If you use this software and feel so inclined, I'd greatly appreciate an email
-just saying that you tried it out. My email address can be found by running
-this code:
+If you use this software and feel so inclined, I'd greatly appreciate hearing
+just that you tried it out. My email address can be found by running this code:
 
 ```python
 first_name = "naftali"
@@ -168,3 +177,5 @@ Even something as simple as the following would be mega-awesome:
     I tried out lazysorted to compute medians faster. Thought you'd like to know!
     
     --Jim
+
+There is of course no obligation to do this.
