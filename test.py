@@ -155,14 +155,9 @@ class TestLazySorted(unittest.TestCase):
                 random.shuffle(xs)
                 ls = LazySorted(xs)
 
-                with self.assertRaises(ValueError):
-                    ls.index(-1)
-
-                with self.assertRaises(ValueError):
-                    ls.index(n)
-
-                with self.assertRaises(ValueError):
-                    ls.index(5.5)
+                self.assertRaises(ValueError, lambda: ls.index(-1))
+                self.assertRaises(ValueError, lambda: ls.index(n))
+                self.assertRaises(ValueError, lambda: ls.index(5.5))
 
     def test_index_nonunique(self):
         """The index method should work in the presence of nonunique items"""
@@ -233,4 +228,4 @@ class TestLazySorted(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=1)
+    unittest.main()

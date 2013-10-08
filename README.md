@@ -128,7 +128,9 @@ And LazySorted is empirically faster, as you can see from benchmark.py
 
 Yes, but it lacks the full generality of this module. For example, you can use
 it to get the k smallest elements, (in n * log(k) time), but not k arbitrary
-contiguous elements.
+contiguous elements. This module represents a different paradigm: you're
+allowed to program as if your list was sorted, and let the module deal with the
+details.
 
 **How is lazysorted licensed?**
 
@@ -155,6 +157,10 @@ See LICENSE for details.
 Unfortunately, only okay. This turns out to be basically due to the fact that
 CPython deals with python objects by passing around pointers to them. The gory
 details can be found on (my blog)[http://www.naftaliharris.com/blog/heapobjects].
+
+**What python versions does lazysorted work with?**
+
+I've tried out python2.6 and python2.7.
 
 Contact me!
 ---------
