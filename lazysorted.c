@@ -4,6 +4,30 @@
 #include <time.h>
 #include "params.h"
 
+/* Macro definitions to deal with both python2 and python3 */
+#if PY_MAJOR_VERSION >= 3
+#define PyString_FromString PyUnicode_FromString
+#define PyString_Format PyUnicode_Format
+#define PyInt_FromSsize_t PyLong_FromSsize_t
+#endif
+
+#if PY_VERSION_HEX < 0x030200f0
+#define PySlice_GetIndicesEx(item,                                   \
+                             length, start, stop, step, slicelength) \
+        PySlice_GetIndicesEx((PySliceObject*)item,                   \
+                             length, start, stop, step, slicelength)
+#endif
+
+/* Deal with python2.5 and earlier */
+#ifndef PyVarObject_HEAD_INIT
+    #define PyVarObject_HEAD_INIT(type, size) \
+            PyObject_HEAD_INIT(type) size,
+#endif
+
+#ifndef Py_SIZE
+#define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
+#endif
+
 /* Definitions and functions for the binary search tree of pivot points.
  * The BST implementation is a Treap, selected because of its general speed,
  * especially when inserting and removing elements, which happens a lot in this
@@ -884,7 +908,7 @@ ls_subscript(LSObject* self, PyObject* item)
     else if (PySlice_Check(item)) {
         Py_ssize_t start, stop, step, slicelength;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, Py_SIZE(self->xs),
+        if (PySlice_GetIndicesEx(item, Py_SIZE(self->xs),
                          &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -1289,6 +1313,40 @@ PyDoc_STRVAR(module_doc,
 );
 
 /* Initialization function for the module */
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit_lazysorted(void)
+{
+    srand(time(NULL)); /* XXX Worry about security, thread-safety etc */
+
+    PyObject *m;
+
+    /* Finalize the type object including setting type of the new type
+     * object; doing it here is required for portability, too. */
+
+    if (PyType_Ready(&LS_Type) < 0)
+        return NULL;
+
+    /* Create the module and add the functions */
+    static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "lazysorted",        /* m_name */
+        module_doc,          /* m_doc */
+        -1,                  /* m_size */
+        ls_methods,          /* m_methods */
+        NULL,                /* m_reload */
+        NULL,                /* m_traverse */
+        NULL,                /* m_clear */
+        NULL,                /* m_free */
+    };
+    m = PyModule_Create(&moduledef);
+    if (m == NULL)
+        return NULL;
+
+    PyModule_AddObject(m, "LazySorted", (PyObject *)&LS_Type);
+    return m;
+}
+#else
 PyMODINIT_FUNC
 initlazysorted(void)
 {
@@ -1308,4 +1366,6 @@ initlazysorted(void)
         return;
 
     PyModule_AddObject(m, "LazySorted", (PyObject *)&LS_Type);
+    return;
 }
+#endif
