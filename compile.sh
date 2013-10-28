@@ -3,25 +3,20 @@
 
 rm -rf build
 
-echo -e "\n\nPYTHON 2.5\n==========\n"
-python2.5 setup.py build
-read -p "Enter to continue"
+for version in 2.5 2.6 2.7
+do
+echo -e "\n\nPYTHON $version\n==========\n"
+python$version setup.py build
+PYTHONPATH="build/lib.linux-x86_64-$version/" python$version test.py
+done
 
-echo -e "\n\nPYTHON 2.6\n==========\n"
-python2.6 setup.py build
-read -p "Enter to continue"
+2to3 --no-diffs -w test.py
 
-echo -e "\n\nPYTHON 2.7\n==========\n"
-python2.7 setup.py build
-read -p "Enter to continue"
+for version in 3.1 3.2 3.3
+do
+echo -e "\n\nPYTHON $version\n==========\n"
+python$version setup.py build
+PYTHONPATH="build/lib.linux-x86_64-$version/" python$version test.py
+done
 
-echo -e "\n\nPYTHON 3.1\n==========\n"
-python3.1 setup.py build
-read -p "Enter to continue"
-
-echo -e "\n\nPYTHON 3.2\n==========\n"
-python3.2 setup.py build
-read -p "Enter to continue"
-
-echo -e "\n\nPYTHON 3.3\n==========\n"
-python3.3 setup.py build
+mv test.py.bak test.py

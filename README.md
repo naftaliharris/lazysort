@@ -22,7 +22,7 @@ You can use LazySorted much the same way you use the sorted(.) function:
 ```python
 >>> import random
 >>> from lazysorted import LazySorted
->>> xs = range(1000)
+>>> xs = list(range(1000))
 >>> random.shuffle(xs)
 >>> xs_sorted = LazySorted(xs)
 >>> xs_sorted[43]
@@ -160,7 +160,7 @@ details can be found on (my blog)[http://www.naftaliharris.com/blog/heapobjects]
 
 **What python versions does lazysorted work with?**
 
-I've tried out python2.6 and python2.7.
+I've tried out 2.5, 2.6, 2.7, 3.1, 3.2, and 3.3, and it works with all of those.
 
 Contact me!
 ---------

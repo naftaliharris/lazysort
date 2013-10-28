@@ -168,15 +168,15 @@ class TestLazySorted(unittest.TestCase):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.index("b"), a)
-                    self.assertEquals(ls.index("a"), 0)
+                    self.assertEqual(ls.index("b"), a)
+                    self.assertEqual(ls.index("a"), 0)
 
                 for rep in xrange(3):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.index("a"), 0)
-                    self.assertEquals(ls.index("b"), a)
+                    self.assertEqual(ls.index("a"), 0)
+                    self.assertEqual(ls.index("b"), a)
 
     def test_count_nonunique(self):
         """The count method should work in the presence of nonunique items"""
@@ -187,15 +187,15 @@ class TestLazySorted(unittest.TestCase):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.count("b"), b)
-                    self.assertEquals(ls.count("a"), a)
+                    self.assertEqual(ls.count("b"), b)
+                    self.assertEqual(ls.count("a"), a)
 
                 for rep in xrange(3):
                     random.shuffle(xs)
                     ls = LazySorted(xs)
 
-                    self.assertEquals(ls.count("a"), a)
-                    self.assertEquals(ls.count("b"), b)
+                    self.assertEqual(ls.count("a"), a)
+                    self.assertEqual(ls.count("b"), b)
 
     def test_count_simple(self):
         """The count method should work on simple queries"""
@@ -220,11 +220,11 @@ class TestLazySorted(unittest.TestCase):
 
             ls = LazySorted(xs)
             for item in items:
-                self.assertEquals(ls.count(item), itemcounts[item])
+                self.assertEqual(ls.count(item), itemcounts[item])
 
         for n in xrange(1, 128):
             ls = LazySorted([0] * n)
-            self.assertEquals(ls.count(0), n)
+            self.assertEqual(ls.count(0), n)
 
 
 if __name__ == "__main__":
