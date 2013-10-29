@@ -1433,7 +1433,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_richcompare*/
     0,                      /*tp_weaklistoffset*/
     LSObject_iter,          /*tp_iter*/
-    LSObject_iternext,      /*tp_iternext*/
+    0,                      /*tp_iternext*/
     LS_methods,             /*tp_methods*/
     0,                      /*tp_members*/
     0,                      /*tp_getset*/
