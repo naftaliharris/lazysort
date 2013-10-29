@@ -9,6 +9,7 @@
 #define PyString_FromString PyUnicode_FromString
 #define PyString_Format PyUnicode_Format
 #define PyInt_FromSsize_t PyLong_FromSsize_t
+#define Py_TPFLAGS_HAVE_ITER 0
 #endif
 
 #if PY_VERSION_HEX < 0x030200f0
@@ -18,7 +19,7 @@
                              length, start, stop, step, slicelength)
 #endif
 
-/* Deal with python2.5 and earlier */
+/* Deal with python2.5 */
 #ifndef PyVarObject_HEAD_INIT
     #define PyVarObject_HEAD_INIT(type, size) \
             PyObject_HEAD_INIT(type) size,
@@ -26,6 +27,10 @@
 
 #ifndef Py_SIZE
 #define Py_SIZE(ob)             (((PyVarObject*)(ob))->ob_size)
+#endif
+
+#ifndef Py_Type
+#define Py_TYPE(ob)             (((PyObject*)(ob))->ob_type)
 #endif
 
 /* Definitions and functions for the binary search tree of pivot points.
@@ -57,7 +62,6 @@ typedef struct {
 } LSObject;
 
 static PyTypeObject LS_Type;
-
 #define LSObject_Check(v)      (Py_TYPE(v) == &LS_Type)
 
 /* Returns the next (bigger) pivot, or NULL if it's the last pivot */
@@ -1169,6 +1173,98 @@ LS_dealloc(LSObject *self)
     PyObject_Del(self);
 }
 
+
+/* The LazySorted iterator object */
+/* TODO: Be a little smarter in implementing this, (keep track of pivots, etc) */
+typedef struct {
+    PyObject_HEAD
+    LSObject            *ls;            /* The referenced lazysorted object */
+    Py_ssize_t          i;              /* The next location to check */
+} LSIterObject;
+
+static PyTypeObject LSIter_Type;
+#define LSIterObject_Check(v)      (Py_TYPE(v) == &LSIter_Type)
+
+static PyMethodDef LSIterObject_methods[] = {
+    {NULL, NULL}           /* sentinel */
+};
+
+PyObject*
+LSObject_iter(PyObject *self)
+{
+    LSIterObject *it;
+
+    if (!LSObject_Check(self)) {
+        PyErr_BadInternalCall();
+        return NULL;
+    }
+    it = PyObject_GC_New(LSIterObject, &LSIter_Type);
+    if (it == NULL)
+        return NULL;
+    it->i = 0;
+    Py_INCREF(self);
+    it->ls = (LSObject *)self;
+
+    return (PyObject *)it;
+}
+
+static void
+LSIterObject_dealloc(LSIterObject *it)
+{
+    Py_XDECREF(it->ls);
+    PyObject_GC_Del(it);
+}
+
+PyObject*
+LSObject_iternext(PyObject *self)
+{
+    LSIterObject *lsi = (LSIterObject *)self;
+    if (lsi->i < ls_length(lsi->ls)) {
+        sort_point(lsi->ls, lsi->i);
+        PyObject *res = lsi->ls->xs->ob_item[lsi->i];
+        Py_INCREF(res);
+        (lsi->i)++;
+        return res;
+    } else {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+}
+
+static PyTypeObject LSIter_Type = {
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    "LazySortedIterator",                       /* tp_name */
+    sizeof(LSIterObject),                       /* tp_basicsize */
+    0,                                          /* tp_itemsize */
+    /* methods */
+    (destructor)LSIterObject_dealloc,           /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    0,                                          /* tp_compare */
+    0,                                          /* tp_repr */
+    0,                                          /* tp_as_number */
+    0,                                          /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    0,                                          /* tp_str */
+    0,                                          /* tp_getattro */
+    0,                                          /* tp_setattro */
+    0,                                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                         /* tp_flags */
+    0,                                          /* tp_doc */
+    0,                                          /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    PyObject_SelfIter,                          /* tp_iter */
+    (iternextfunc)LSObject_iternext,            /* tp_iternext */
+    LSIterObject_methods,                       /* tp_methods */
+    0,                                          /* tp_members */
+};
+
+
 /* TODO: This documentation sucks */
 static PyMethodDef LS_methods[] = {
     {"__getitem__", (PyCFunction)ls_subscript, METH_O|METH_COEXIST,
@@ -1280,14 +1376,14 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_getattro*/
     0,                      /*tp_setattro*/
     0,                      /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,     /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER, /*tp_flags*/
     0,                      /*tp_doc*/
     0,                      /*tp_traverse*/
     0,                      /*tp_clear*/
     0,                      /*tp_richcompare*/
     0,                      /*tp_weaklistoffset*/
-    0,                      /*tp_iter*/
-    0,                      /*tp_iternext*/
+    LSObject_iter,          /*tp_iter*/
+    LSObject_iternext,      /*tp_iternext*/
     LS_methods,             /*tp_methods*/
     0,                      /*tp_members*/
     0,                      /*tp_getset*/
