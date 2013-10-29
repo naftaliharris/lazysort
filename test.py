@@ -2,8 +2,9 @@
 
 import unittest
 import random
-import lazysorted
+from itertools import islice
 import doctest
+import lazysorted
 from lazysorted import LazySorted
 
 
@@ -231,7 +232,19 @@ class TestLazySorted(unittest.TestCase):
         for length in xrange(512):
             items = range(length)
             random.shuffle(items)
-            self.assertEqual(list(LazySorted(items)), sorted(items))
+            self.assertEqual(list(LazySorted(items)), range(length))
+
+    def test_interupted_iter(self):
+        """Iteration should work even if it's interrupted by other calls"""
+        for rep in xrange(100):
+            items = range(512)
+            random.shuffle(items)
+            ls = LazySorted(items)
+            it = iter(ls)
+            self.assertEqual(list(islice(it, 30)), range(0, 30))
+            _ = ls[random.randrange(512)]
+            _ = random.randrange(-100, 600) in ls
+            self.assertEqual(list(islice(it, 30)), range(30, 60))
 
 
 if __name__ == "__main__":
