@@ -59,6 +59,8 @@ typedef struct {
     PyObject_HEAD
     PyListObject        *xs;            /* Partially sorted list */
     PivotNode           *root;          /* Root of the pivot BST */
+    PyObject            *keyfunc;       /* The key function */
+    int                 orient;         /* -1 if reverse else 1 */
 } LSObject;
 
 static PyTypeObject LS_Type;
@@ -168,7 +170,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
         return node;
     }
 
-    /* Put the node in it's sorted order */
+    /* Put the node in its sorted order */
     PivotNode *current = start;
     while (1) {
         if (current->idx < k) {
@@ -480,13 +482,16 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
+    self->root = NULL;
+    if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
+        return NULL;
+
     self->xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, args, kwds);
     if (self->xs == NULL)
         return NULL;
 
-    self->root = NULL;
-    if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
-        return NULL;
+    self->keyfunc = NULL;
+    self->orient = 1;
 
     return (PyObject *)self;
 }
@@ -1168,6 +1173,9 @@ ls_length(LSObject *self)
 static void
 LS_dealloc(LSObject *self)
 {
+    if (self->keyfunc != NULL) {
+        Py_DECREF(self->keyfunc);
+    }
     Py_DECREF(self->xs);
     free_tree(self->root);
     PyObject_Del(self);
@@ -1337,14 +1345,31 @@ static PyMappingMethods ls_as_mapping = {
 static int
 LS_init(LSObject *self, PyObject *args, PyObject *kw)
 {
-    PyObject *arg = NULL;
-    static char *kwlist[] = {"sequence", 0};
+    PyObject *sequence = NULL;
+    PyObject *keyfunc = NULL;
+    int reverse = 0;
+    static char *kwlist[] = {"sequence", "key", "reverse", 0};
 
-    if (!PyArg_ParseTupleAndKeywords(args, kw, "|O:list", kwlist, &arg))
+    if (!PyArg_ParseTupleAndKeywords(args, kw, "O|Oi:list",
+        kwlist, &sequence, &keyfunc, &reverse))
         return -1;
 
-    if (PyList_Type.tp_init((PyObject *)self->xs, args, kw))
+    PyObject *list_args = Py_BuildValue("(O)", sequence);
+    if (list_args == NULL)
         return -1;
+
+    PyObject *list_kws = Py_BuildValue("{}");
+    if (list_kws == NULL)
+        return -1;
+
+    if (PyList_Type.tp_init((PyObject *)self->xs, list_args, list_kws))
+        return -1;
+
+    if (reverse)
+        self->orient = -1;
+
+    if (keyfunc != Py_None)
+        self->keyfunc = keyfunc;
 
     if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
             NULL)
@@ -1376,7 +1401,8 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_getattro*/
     0,                      /*tp_setattro*/
     0,                      /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER, /*tp_flags*/
+    Py_TPFLAGS_DEFAULT |
+    Py_TPFLAGS_HAVE_ITER,   /*tp_flags*/
     0,                      /*tp_doc*/
     0,                      /*tp_traverse*/
     0,                      /*tp_clear*/
