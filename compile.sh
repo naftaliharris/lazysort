@@ -11,6 +11,8 @@ if [ $? -ne 0 ]
 then
     exit 1
 fi
+echo ""
+PYTHONPATH="build/lib.linux-x86_64-$version/" python$version -c "import lazysorted; print(lazysorted);"
 PYTHONPATH="build/lib.linux-x86_64-$version/" python$version test.py
 if [ $? -ne 0 ]
 then
@@ -29,6 +31,8 @@ then
     mv test.py.bak test.py
     exit 1
 fi
+echo ""
+PYTHONPATH="build/lib.linux-x86_64-$version/" python$version -c "import lazysorted; print(lazysorted);"
 PYTHONPATH="build/lib.linux-x86_64-$version/" python$version test.py
 if [ $? -ne 0 ]
 then

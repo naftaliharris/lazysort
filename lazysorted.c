@@ -507,13 +507,13 @@ islt(PyObject *x, PyObject *y, LSObject *ls)
     if (ls->keyfunc != NULL) {
         PyObject *x_cmp, *y_cmp;
         PyObject *x_arg = Py_BuildValue("(O)", x);
-        x_cmp = PyEval_CallObject(ls->keyfunc, x_arg);
+        x_cmp = PyObject_CallObject(ls->keyfunc, x_arg);
         Py_DECREF(x_arg);
         if (x_cmp == NULL)
             return -1;
 
         PyObject *y_arg = Py_BuildValue("(O)", y);
-        y_cmp = PyEval_CallObject(ls->keyfunc, y_arg);
+        y_cmp = PyObject_CallObject(ls->keyfunc, y_arg);
         Py_DECREF(y_arg);
         if (y_cmp == NULL) {
             Py_DECREF(x_arg);
