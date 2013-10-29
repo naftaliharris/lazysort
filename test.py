@@ -226,6 +226,13 @@ class TestLazySorted(unittest.TestCase):
             ls = LazySorted([0] * n)
             self.assertEqual(ls.count(0), n)
 
+    def test_sorting(self):
+        """Iteration should be equivalent to sorting"""
+        for length in xrange(512):
+            items = range(length)
+            random.shuffle(items)
+            self.assertEqual(list(LazySorted(items)), sorted(items))
+
 
 if __name__ == "__main__":
     unittest.main()
