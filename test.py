@@ -9,6 +9,7 @@ from lazysorted import LazySorted
 
 
 class TestLazySorted(unittest.TestCase):
+    test_lengths = range(18) + [31, 32, 33, 63, 64, 65, 127, 128, 129]
 
     def test_creation(self):
         """LazySorted objects can be created from any iterable"""
@@ -22,7 +23,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_random_select(self):
         """Selection should work once"""
-        for n in xrange(1, 64):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             for k in xrange(1, n):
                 for rep in xrange(10):
@@ -32,7 +33,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_multiple_select(self):
         """Selection should work many times in a row"""
-        for n in xrange(1, 64):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ks = 2 * range(n)  # include multiple accesses
             for rep in xrange(10):
@@ -45,15 +46,15 @@ class TestLazySorted(unittest.TestCase):
 
     def test_len(self):
         """the __len__ method and len(.) builtin should work"""
-        for n in xrange(1024):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ls = LazySorted(xs)
             self.assertEqual(len(ls), n)
             self.assertEqual(ls.__len__(), n)
 
     def test_select_range(self):
-        """selecting contiguous foward ranges should work"""
-        for n in xrange(128):
+        """selecting contiguous forward ranges should work"""
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             for list_rep in xrange(5):
                 random.shuffle(xs)
@@ -67,13 +68,13 @@ class TestLazySorted(unittest.TestCase):
 
     def test_full_range(self):
         """selecting slice objects with steps should work"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(n)
             for list_rep in xrange(5):
                 random.shuffle(xs)
                 ls = LazySorted(xs)
-                for select_rep in xrange(128):
+                for select_rep in xrange(16):
                     a = random.randrange(-n, n + 1)
                     b = random.randrange(-n, n + 1)
                     c = random.randrange(1, n + 3) * random.choice([-1, 1])
@@ -83,7 +84,7 @@ class TestLazySorted(unittest.TestCase):
     def test_step(self):
         """selecting slice objects with only a step defined should work"""
         steps = [-64, -16, -2, -1, 1, 2, 16, 64]
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(n)
             for list_rep in xrange(5):
@@ -95,7 +96,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_between(self):
         """the between method should work"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(n)
             for rep in xrange(100):
@@ -118,7 +119,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_contains(self):
         """The __contains__ method and `in' keyword should work"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
             for rep in xrange(10):
@@ -137,7 +138,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_simple_index(self):
         """The index method should work"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(n)
             for rep in xrange(5):
@@ -150,7 +151,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_index_valueerror(self):
         """The index method should raise a ValueError if item not in list"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             for rep in xrange(5):
                 random.shuffle(xs)
@@ -200,7 +201,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_count_simple(self):
         """The count method should work on simple queries"""
-        for n in xrange(128):
+        for n in TestLazySorted.test_lengths:
             xs = range(n)
             ys = range(0, n, 5) + [-4, -3, -2, -1, 0, n, n + 1, n + 2, 3.3]
             for rep in xrange(5):
@@ -213,7 +214,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_count_manynonunique(self):
         """The count method should work with very many nonunique items"""
-        for rep in xrange(5000):
+        for rep in xrange(2000):
             items = range(random.randint(1, 50))
             random.shuffle(items)
             itemcounts = [random.randint(0, 16) for _ in items]
@@ -223,13 +224,13 @@ class TestLazySorted(unittest.TestCase):
             for item in items:
                 self.assertEqual(ls.count(item), itemcounts[item])
 
-        for n in xrange(1, 128):
+        for n in TestLazySorted.test_lengths:
             ls = LazySorted([0] * n)
             self.assertEqual(ls.count(0), n)
 
     def test_sorting(self):
         """Iteration should be equivalent to sorting"""
-        for length in xrange(512):
+        for length in TestLazySorted.test_lengths:
             items = range(length)
             random.shuffle(items)
             self.assertEqual(list(LazySorted(items)), range(length))
@@ -248,7 +249,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_reverse(self):
         """Reverse iteration should be equivalent to reverse sorting"""
-        for length in xrange(512):
+        for length in TestLazySorted.test_lengths:
             items = range(length)
             random.shuffle(items)
             self.assertEqual(list(LazySorted(items, reverse=True)),
