@@ -60,7 +60,7 @@ typedef struct {
     PyListObject        *xs;            /* Partially sorted list */
     PivotNode           *root;          /* Root of the pivot BST */
     PyObject            *keyfunc;       /* The key function */
-    int                 orient;         /* -1 if reverse else 1 */
+    int                 reverse;        /* 1 for reverse order */
 } LSObject;
 
 static PyTypeObject LS_Type;
@@ -491,7 +491,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
 
     self->keyfunc = NULL;
-    self->orient = 1;
+    self->reverse = 0;
 
     return (PyObject *)self;
 }
@@ -500,9 +500,39 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 /* These macros are basically taken from list.c
  * Returns 1 if x < y, 0 if x >= y, and -1 on error */
-#define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT)
+/* #define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT) */
+static inline int
+islt(PyObject *x, PyObject *y, LSObject *ls)
+{
+    if (ls->keyfunc != NULL) {
+        PyObject *x_cmp, *y_cmp;
+        PyObject *x_arg = Py_BuildValue("(O)", x);
+        x_cmp = PyEval_CallObject(ls->keyfunc, x_arg);
+        Py_DECREF(x_arg);
+        if (x_cmp == NULL)
+            return -1;
 
-#define IFLT(X, Y) if ((ltflag = ISLT(X, Y)) < 0) goto fail;  \
+        PyObject *y_arg = Py_BuildValue("(O)", y);
+        y_cmp = PyEval_CallObject(ls->keyfunc, y_arg);
+        Py_DECREF(y_arg);
+        if (y_cmp == NULL) {
+            Py_DECREF(x_arg);
+            return -1;
+        }
+
+        int res = ls->reverse ? PyObject_RichCompareBool(x_cmp, y_cmp, Py_GT)
+                              : PyObject_RichCompareBool(x_cmp, y_cmp, Py_LT);
+
+        Py_DECREF(x_cmp);
+        Py_DECREF(y_cmp);
+        return res;
+    } else {
+        return ls->reverse ? PyObject_RichCompareBool(x, y, Py_GT)
+                           : PyObject_RichCompareBool(x, y, Py_LT);
+    }
+}
+
+#define IFLT(X, Y) if ((ltflag = islt(X, Y, ls)) < 0) goto fail;  \
             if(ltflag)
 
 /* N.B: No semicolon at the end, so that you can include one yourself */
@@ -513,8 +543,10 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 /* Picks a pivot point among the indices left <= i < right. Returns -1 on
  * error */
 static Py_ssize_t
-pick_pivot(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+pick_pivot(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
+    PyObject **ob_item = ls->xs->ob_item;
+
     /* Use median of three trick */
     Py_ssize_t idx1 = left + rand() % (right - left);
     Py_ssize_t idx2 = left + rand() % (right - left);
@@ -560,13 +592,15 @@ fail:
  * [less than region | greater or equal to region]
  * and returns the pivot index, or -1 on error */
 static Py_ssize_t
-partition(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+partition(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
+    PyObject **ob_item = ls->xs->ob_item;
+
     PyObject *tmp;  /* Used by SWAP macro */
     PyObject *pivot;
     int ltflag;
 
-    Py_ssize_t piv_idx = pick_pivot(ob_item, left, right);
+    Py_ssize_t piv_idx = pick_pivot(ls, left, right);
     if (piv_idx < 0) {
         return -1;
     }
@@ -595,14 +629,17 @@ fail:  /* From IFLT macro */
 
 /* Runs insertion sort on the items left <= i < right */
 static void
-insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+insertion_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
+    PyObject **ob_item = ls->xs->ob_item;
+
     PyObject *tmp;
     Py_ssize_t i, j;
 
     for (i = left; i < right; i++) {
         tmp = ob_item[i];
-        for (j = i; j > 0 && ISLT(tmp, ob_item[j - 1]); j--)
+        /* TODO: Check the error code from islt */
+        for (j = i; j > 0 && islt(tmp, ob_item[j - 1], ls); j--)
             ob_item[j] = ob_item[j - 1];
         ob_item[j] = tmp;
     }
@@ -611,21 +648,21 @@ insertion_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
 /* Runs quicksort on the items left <= i < right, returning 1 on success
  * or zero on error. Does not affect stored pivots at all. */
 static int
-quick_sort(PyObject **ob_item, Py_ssize_t left, Py_ssize_t right)
+quick_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
     if (right - left <= SORT_THRESH) {
-        insertion_sort(ob_item, left, right);
+        insertion_sort(ls, left, right);
         return 0;
     }
 
-    Py_ssize_t piv_idx = partition(ob_item, left, right);
+    Py_ssize_t piv_idx = partition(ls, left, right);
     if (piv_idx < 0)
         return -1;
 
-    if (quick_sort(ob_item, left, piv_idx) < 0)
+    if (quick_sort(ls, left, piv_idx) < 0)
         return -1;
 
-    if (quick_sort(ob_item, piv_idx + 1, right) < 0)
+    if (quick_sort(ls, piv_idx + 1, right) < 0)
         return -1;
 
     return 0;
@@ -649,26 +686,8 @@ sort_point(LSObject *ls, Py_ssize_t k)
     /* Run quickselect */
     Py_ssize_t piv_idx;
 
-    /*
-    Py_ssize_t left_idx = left->idx;
-    Py_ssize_t right_idx = right->idx;
-    while (left_idx + 1 + SORT_THRESH <= right_idx) {
-        piv_idx = partition(ls->xs->ob_item, left_idx + 1, right_idx);
-        if (piv_idx < k) {
-            left_idx = piv_idx;
-        }
-        else if (piv_idx > k) {
-            right_idx = piv_idx;
-        }
-        else {
-            return 0;
-        }
-    }
-    insertion_sort(ls->xs->ob_item, left_idx + 1, right_idx);
-    */
-
     while (left->idx + 1 + SORT_THRESH <= right->idx) {
-        piv_idx = partition(ls->xs->ob_item, left->idx + 1, right->idx);
+        piv_idx = partition(ls, left->idx + 1, right->idx);
         if (piv_idx < 0) return -1;
         if (piv_idx < k) {
             if (left->right == NULL) {
@@ -711,7 +730,7 @@ sort_point(LSObject *ls, Py_ssize_t k)
         }
     }
 
-    insertion_sort(ls->xs->ob_item, left->idx + 1, right->idx);
+    insertion_sort(ls, left->idx + 1, right->idx);
     left->flags |= SORTED_LEFT;
     right->flags |= SORTED_RIGHT;
     depivot(left, right, &ls->root);
@@ -753,7 +772,7 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
         else {
             /* Since we are sorting the entire region, we don't need to keep
              * track of pivots, and so we can use vanilla quicksort */
-            quick_sort(ls->xs->ob_item, current->idx + 1, next->idx);
+            quick_sort(ls, current->idx + 1, next->idx);
             current->flags |= SORTED_LEFT;
             next->flags |= SORTED_RIGHT;
         }
@@ -821,8 +840,7 @@ find_item(LSObject *ls, PyObject *item)
     else {
         Py_ssize_t piv_idx;
         while (left->idx + 1 + SORT_THRESH <= right->idx) {
-            piv_idx = partition(ls->xs->ob_item, left->idx + 1,
-                                    right->idx);
+            piv_idx = partition(ls, left->idx + 1, right->idx);
             IFLT(ls->xs->ob_item[piv_idx], item) {
                 if (left->right == NULL) {
                     middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -854,7 +872,7 @@ find_item(LSObject *ls, PyObject *item)
         left_idx = left->idx + 1;
         right_idx = right->idx == xs_len ? xs_len : right->idx + 1;
 
-        insertion_sort(ls->xs->ob_item, left->idx + 1, right->idx);
+        insertion_sort(ls, left->idx + 1, right->idx);
         left->flags |= SORTED_LEFT;
         right->flags |= SORTED_RIGHT;
         depivot(left, right, &ls->root);
@@ -1366,10 +1384,16 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
         return -1;
 
     if (reverse)
-        self->orient = -1;
+        self->reverse = 1;
 
-    if (keyfunc != Py_None)
+    if (keyfunc != NULL) {
+        if (!PyCallable_Check(keyfunc)) {
+            /* TODO: Mimic whatever error message you get from sorted */
+            PyErr_SetString(PyExc_TypeError, "key must be callable");
+            return -1;
+        }
         self->keyfunc = keyfunc;
+    }
 
     if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
             NULL)

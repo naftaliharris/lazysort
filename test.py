@@ -246,6 +246,24 @@ class TestLazySorted(unittest.TestCase):
             _ = random.randrange(-100, 600) in ls
             self.assertEqual(list(islice(it, 30)), range(30, 60))
 
+    def test_reverse(self):
+        """Reverse iteration should be equivalent to reverse sorting"""
+        for length in xrange(512):
+            items = range(length)
+            random.shuffle(items)
+            self.assertEqual(list(LazySorted(items, reverse=True)),
+                             range(length-1, -1, -1))
+
+    def test_keys(self):
+        """Using keys should work fine"""
+        for rep in xrange(100):
+            items = [(random.random(), random.random()) for _ in xrange(8)]
+            random.shuffle(items)
+            self.assertEqual(list(LazySorted(items, key=lambda x: x[0])),
+                             sorted(items, key=lambda x: x[0]))
+            self.assertEqual(list(LazySorted(items, key=lambda x: x[1])),
+                             sorted(items, key=lambda x: x[1]))
+
 
 if __name__ == "__main__":
     unittest.main()
