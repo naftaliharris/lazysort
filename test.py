@@ -255,14 +255,39 @@ class TestLazySorted(unittest.TestCase):
                              range(length-1, -1, -1))
 
     def test_keys(self):
-        """Using keys should work fine"""
+        """Using keys should work fine, with or without reverse"""
         for rep in xrange(100):
-            items = [(random.random(), random.random()) for _ in xrange(8)]
+            items = [(random.random(), random.random()) for _ in xrange(256)]
             random.shuffle(items)
-            self.assertEqual(list(LazySorted(items, key=lambda x: x[0])),
-                             sorted(items, key=lambda x: x[0]))
-            self.assertEqual(list(LazySorted(items, key=lambda x: x[1])),
-                             sorted(items, key=lambda x: x[1]))
+            for reverse in [True, False]:
+                self.assertEqual(list(LazySorted(items, key=lambda x: x[0])),
+                                 sorted(items, key=lambda x: x[0]))
+                self.assertEqual(list(LazySorted(items, key=lambda x: x[1])),
+                                 sorted(items, key=lambda x: x[1]))
+
+    def test_API(self):
+        """The sorted(...) API should be implemented except for cmp"""
+        xs = range(10)
+        for tryme in [lambda: LazySorted(xs, reverse="foo"),
+                      lambda: LazySorted(xs, key="foo"),
+                      lambda: LazySorted(xs, reverse=True, key="foo"),
+                      lambda: LazySorted(xs, key=5),
+                      lambda: LazySorted(xs, reverse="foo", key=lambda x: x),
+                      lambda: LazySorted(xs, reverse=True, key=5)]:
+            self.assertRaises(TypeError, tryme)
+
+        # NB: LazySorted(xs, reverse=1.5) will succeed in python2.6 and down,
+        # even though it should really fail. This was fixed in python2.7 and
+        # up. See issue 5080 for details: http://bugs.python.org/issue5080
+
+        # Keyword order shouldn't matter if they're named, but should if not
+        LazySorted(xs, key=lambda x: x, reverse=False)
+        LazySorted(xs, reverse=False, key=lambda x: x)
+        LazySorted(xs, lambda x: x, False)
+        self.assertRaises(TypeError, lambda: LazySorted(xs, 0, lambda x: x))
+
+        # You can't call LazySorted without arguments
+        self.assertRaises(TypeError, lambda: LazySorted())
 
 
 if __name__ == "__main__":
