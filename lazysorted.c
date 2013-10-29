@@ -4,7 +4,7 @@
 #include <time.h>
 #include "params.h"
 
-/* Macro definitions to deal with both python2 and python3 */
+/* Macro definitions to deal different python versions */
 #if PY_MAJOR_VERSION >= 3
 #define PyString_FromString PyUnicode_FromString
 #define PyString_Format PyUnicode_Format
@@ -12,14 +12,14 @@
 #define Py_TPFLAGS_HAVE_ITER 0
 #endif
 
-#if PY_VERSION_HEX < 0x030200f0
+#if PY_VERSION_HEX < 0x03020000
 #define PySlice_GetIndicesEx(item,                                   \
                              length, start, stop, step, slicelength) \
         PySlice_GetIndicesEx((PySliceObject*)item,                   \
                              length, start, stop, step, slicelength)
 #endif
 
-/* Deal with python2.5 */
+/* Macros for python2.5 */
 #ifndef PyVarObject_HEAD_INIT
     #define PyVarObject_HEAD_INIT(type, size) \
             PyObject_HEAD_INIT(type) size,
@@ -1175,7 +1175,7 @@ LS_dealloc(LSObject *self)
 
 
 /* The LazySorted iterator object */
-/* TODO: Be a little smarter in implementing this, (keep track of pivots, etc) */
+/* TODO: Be a little smarter here, (keep track of pivots, etc) */
 typedef struct {
     PyObject_HEAD
     LSObject            *ls;            /* The referenced lazysorted object */
