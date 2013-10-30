@@ -31,6 +31,7 @@ and the python lists it produces:
 from lazysorted import LazySorted
 from math import floor, ceil
 
+
 def median(xs):
     """An expected linear time median function"""
     ls = LazySorted(xs)
@@ -66,22 +67,30 @@ def trimmed_mean(xs, alpha=0.05):
 
 ```
 
+In addition to the `__len__` and `__getitem__` methods demostrated above,
+LazySorted also supports the `__iter__`, `__contains__`, `index`, and `count`
+methods, just like a regular python list:
+
 ```python
 >>> import random
 >>> from lazysorted import LazySorted
->>> xs = list(range(1000))
+>>> xs = list(range(1000)) + 5 * [1234]
 >>> random.shuffle(xs)
 >>> ls = LazySorted(xs)
->>> ls[43]
-43
->>> ls[497:503]
-[497, 498, 499, 500, 501, 502]
->>> -1 in ls
+>>> for x in ls:
+...     print(x)
+...     if x >= 3:
+...         break
+0
+1
+2
+3
+>>> 1235 in ls
 False
 >>> ls.index(821)
 821
->>> ls.count(52)
-1
+>>> ls.count(1234)
+5
 
 ```
 
@@ -101,13 +110,14 @@ list, there are a few differences between them:
 When the APIs differ between python2.x and python3.x, lazysorted implements the
 python3.x version. So the LazySorted constructor does not support the `cmp`
 argument that was removed in python3.x, and the LazySorted object does not
-support the `\_\_getslice\_\_` method that was also removed in python3.x.
+support the `__getslice__` method that was also removed in python3.x.
 
 All of the LazySorted methods have pretty good documentation, which can be
 accessed through the builtin `help(...)` function.
 
 I've tested lazysorted and found it to work for CPython versions 2.5, 2.6, 2.7,
 and 3.1, 3.2, and 3.3. I haven't tested 3.0.
+
 
 How it works
 ------------
@@ -238,11 +248,6 @@ Objects](http://www.naftaliharris.com/blog/heapobjects).
 However, this effect doesn't kick in until lists grow larger than about 100K
 values, and even past that lazysorted remains faster than complete sorting.
 
-**What python versions does lazysorted work with?**
-
-I've tried out CPython versions 2.5, 2.6, 2.7, 3.1, 3.2, and 3.3, and it works
-with all of those.
-
 
 Contact me!
 -----------
@@ -251,5 +256,3 @@ If you use this software and feel so inclined, I'd greatly appreciate hearing
 what you are using it for! You can hit me up on Twitter
 [@naftaliharris](https://twitter.com/naftaliharris), or at my email address
 on my [contact page](http://www.naftaliharris.com/contact/).
-
-There is of course no obligation to do this.
