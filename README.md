@@ -113,6 +113,22 @@ it's supposed to. You can test it yourself (after installing it) with
 Blah blah benchmarks
 
 
+Example
+-------
+
+```python
+def median(xs):
+    """An expected linear time median function"""
+    n = len(xs)
+    if n == 0:
+        raise ValueError("Need a non-empty list")
+    elif n % 2 == 1:
+        return LazySorted(xs)[n//2]
+    else:
+        return sum(LazySorted(xs)[(n/2-1):(n/2+1)]) / 2.0
+
+```
+
 FAQ
 ---
 

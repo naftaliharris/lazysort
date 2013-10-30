@@ -847,6 +847,7 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
  * calling find_item on some list with item = 1 will result in the following
  * list:
  * [0, 0, 0, 1, 2, 2, 1, 2, 1, 1, 2]
+ * TODO: Would this be fixed by changing < to <= in islt?
  */
 static Py_ssize_t find_item(LSObject *, PyObject *)
 Py_GCC_ATTRIBUTE((warn_unused_result));
