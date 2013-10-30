@@ -98,10 +98,10 @@ next_pivot(PivotNode *current)
  * Does not assume that the node is the root of the tree, and does NOT examine
  * the parentage of node. This is important, because it is often called on
  * nodes whose future parents don't know them yet, like in merge_trees(.) */
+#ifndef NDEBUG
 static void
 assert_node(PivotNode *node)
 {
-#ifndef NDEBUG
     if (node->left != NULL) {
         assert(node->left->idx < node->idx);
         assert(node->left->priority <= node->priority);
@@ -114,7 +114,6 @@ assert_node(PivotNode *node)
         assert(node->right->parent == node);
         assert_node(node->right);
     }
-#endif
 }
 
 /* A series of assert statements that the tree structure is consistent */
@@ -130,7 +129,6 @@ assert_tree(PivotNode *root)
 static void
 assert_tree_flags(PivotNode *root)
 {
-#ifndef NDEBUG
     PivotNode *prev = NULL;
     PivotNode *curr = root;
     while (curr->left != NULL)
@@ -144,12 +142,21 @@ assert_tree_flags(PivotNode *root)
         prev = curr;
         curr = next_pivot(curr);
     }
-#endif
 }
+#else
+/* Silences -Wunused-parameter */
+#define assert_node(x)
+#define assert_tree(x)
+#define assert_tree_flags(x)
+#endif
+
 
 /* Inserts an index, returning a pointer to the node, or NULL on error.
  * *root is the root of the tree, while start is the node to insert from.
  */
+static PivotNode *insert_pivot(Py_ssize_t, int, PivotNode **, PivotNode *)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static PivotNode *
 insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
 {
@@ -394,6 +401,10 @@ depivot(PivotNode *left, PivotNode *right, PivotNode **root)
 /* If the value at middle is equal to the value at left, left is removed.
  * If the value at middle is equal to the value at right, right is removed.
  * Returns 0 on success, or -1 on failure */
+
+static int uniq_pivots(PivotNode *, PivotNode *, PivotNode *, LSObject *)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static int
 uniq_pivots(PivotNode *left, PivotNode *middle, PivotNode *right, LSObject *ls)
 {
@@ -501,16 +512,22 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 /* These macros are basically taken from list.c
  * Returns 1 if x < y, 0 if x >= y, and -1 on error */
 /* #define ISLT(X, Y) PyObject_RichCompareBool(X, Y, Py_LT) */
+
+static inline int islt(PyObject *, PyObject *, LSObject *)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static inline int
 islt(PyObject *x, PyObject *y, LSObject *ls)
 {
     if (ls->keyfunc != NULL) {
         PyObject *x_cmp, *y_cmp;
+
         PyObject *x_arg = Py_BuildValue("(O)", x);
         x_cmp = PyObject_CallObject(ls->keyfunc, x_arg);
         Py_DECREF(x_arg);
-        if (x_cmp == NULL)
+        if (x_cmp == NULL) {
             return -1;
+        }
 
         PyObject *y_arg = Py_BuildValue("(O)", y);
         y_cmp = PyObject_CallObject(ls->keyfunc, y_arg);
@@ -542,6 +559,10 @@ islt(PyObject *x, PyObject *y, LSObject *ls)
 
 /* Picks a pivot point among the indices left <= i < right. Returns -1 on
  * error */
+
+static Py_ssize_t pick_pivot(LSObject *, Py_ssize_t, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static Py_ssize_t
 pick_pivot(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
@@ -591,6 +612,9 @@ fail:
 /* Partitions the data between left and right into
  * [less than region | greater or equal to region]
  * and returns the pivot index, or -1 on error */
+static Py_ssize_t partition(LSObject *, Py_ssize_t, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static Py_ssize_t
 partition(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
@@ -628,7 +652,10 @@ fail:  /* From IFLT macro */
 }
 
 /* Runs insertion sort on the items left <= i < right */
-static void
+static int insertion_sort(LSObject *, Py_ssize_t, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
+static int
 insertion_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
     PyObject **ob_item = ls->xs->ob_item;
@@ -638,21 +665,27 @@ insertion_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 
     for (i = left; i < right; i++) {
         tmp = ob_item[i];
-        /* TODO: Check the error code from islt */
-        for (j = i; j > 0 && islt(tmp, ob_item[j - 1], ls); j--)
+        int ltflag = 0;
+        for (j = i; j > 0 && (ltflag = islt(tmp, ob_item[j - 1], ls)) > 0; j--)
             ob_item[j] = ob_item[j - 1];
         ob_item[j] = tmp;
+        if (ltflag < 0) {
+            return -1;
+        }
     }
+    return 0;
 }
 
-/* Runs quicksort on the items left <= i < right, returning 1 on success
- * or zero on error. Does not affect stored pivots at all. */
+/* Runs quicksort on the items left <= i < right, returning 0 on success
+ * or -1 on error. Does not affect stored pivots at all. */
+static int quick_sort(LSObject *, Py_ssize_t, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static int
 quick_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 {
     if (right - left <= SORT_THRESH) {
-        insertion_sort(ls, left, right);
-        return 0;
+        return insertion_sort(ls, left, right);
     }
 
     Py_ssize_t piv_idx = partition(ls, left, right);
@@ -670,6 +703,9 @@ quick_sort(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 
 /* Sorts the list ls sufficiently such that ls->xs->ob_item[k] is actually the
  * kth value in sorted order. Returns 0 on success and -1 on error. */
+static int sort_point(LSObject *, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static int
 sort_point(LSObject *ls, Py_ssize_t k)
 {
@@ -688,7 +724,10 @@ sort_point(LSObject *ls, Py_ssize_t k)
 
     while (left->idx + 1 + SORT_THRESH <= right->idx) {
         piv_idx = partition(ls, left->idx + 1, right->idx);
-        if (piv_idx < 0) return -1;
+        if (piv_idx < 0) {
+            /* TODO: Cleanup? */
+            return -1;
+        }
         if (piv_idx < k) {
             if (left->right == NULL) {
                 middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -730,7 +769,10 @@ sort_point(LSObject *ls, Py_ssize_t k)
         }
     }
 
-    insertion_sort(ls, left->idx + 1, right->idx);
+    if (insertion_sort(ls, left->idx + 1, right->idx) < 0) {
+        /* TODO: Cleanup? */
+        return -1;
+    }
     left->flags |= SORTED_LEFT;
     right->flags |= SORTED_RIGHT;
     depivot(left, right, &ls->root);
@@ -740,6 +782,9 @@ sort_point(LSObject *ls, Py_ssize_t k)
 
 /* Sorts the list ls sufficiently such that everything between indices start
  * and stop is in sorted order. Returns 0 on success and -1 on error. */
+static int sort_range(LSObject *, Py_ssize_t, Py_ssize_t)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static int
 sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
 {
@@ -772,7 +817,10 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
         else {
             /* Since we are sorting the entire region, we don't need to keep
              * track of pivots, and so we can use vanilla quicksort */
-            quick_sort(ls, current->idx + 1, next->idx);
+            if (quick_sort(ls, current->idx + 1, next->idx) < 0) {
+                /* TODO: Do we need to cleanup or anything? */
+                return -1;    
+            }
             current->flags |= SORTED_LEFT;
             next->flags |= SORTED_RIGHT;
         }
@@ -800,6 +848,9 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
  * list:
  * [0, 0, 0, 1, 2, 2, 1, 2, 1, 1, 2]
  */
+static Py_ssize_t find_item(LSObject *, PyObject *)
+Py_GCC_ATTRIBUTE((warn_unused_result));
+
 static Py_ssize_t
 find_item(LSObject *ls, PyObject *item)
 {
@@ -840,7 +891,10 @@ find_item(LSObject *ls, PyObject *item)
     else {
         Py_ssize_t piv_idx;
         while (left->idx + 1 + SORT_THRESH <= right->idx) {
-            piv_idx = partition(ls, left->idx + 1, right->idx);
+            if ((piv_idx = partition(ls, left->idx + 1, right->idx)) < 0) {
+                /* TODO: Do we need to clean up? */
+                return -2;
+            }
             IFLT(ls->xs->ob_item[piv_idx], item) {
                 if (left->right == NULL) {
                     middle = insert_pivot(piv_idx, UNSORTED, &ls->root, left);
@@ -872,7 +926,9 @@ find_item(LSObject *ls, PyObject *item)
         left_idx = left->idx + 1;
         right_idx = right->idx == xs_len ? xs_len : right->idx + 1;
 
-        insertion_sort(ls, left->idx + 1, right->idx);
+        if (insertion_sort(ls, left->idx + 1, right->idx) < 0) {
+           return -2;
+        }
         left->flags |= SORTED_LEFT;
         right->flags |= SORTED_RIGHT;
         depivot(left, right, &ls->root);
@@ -899,7 +955,7 @@ fail:
     return -2;
 }
 
-/* LazySorted methods */
+/* Public facing LazySorted methods */
 
 static PyObject *indexerr = NULL;
 
@@ -952,8 +1008,9 @@ ls_subscript(LSObject* self, PyObject* item)
                 right++;
             }
 
-            if (sort_range(self, left, right) < 0)
+            if (sort_range(self, left, right) < 0) {
                 return NULL;
+            }
 
             PyListObject *result = (PyListObject *)PyList_New(slicelength);
             if (result == NULL)
@@ -1246,7 +1303,9 @@ LSObject_iternext(PyObject *self)
 {
     LSIterObject *lsi = (LSIterObject *)self;
     if (lsi->i < ls_length(lsi->ls)) {
-        sort_point(lsi->ls, lsi->i);
+        if (sort_point(lsi->ls, lsi->i) < 0) {
+            return NULL;    
+        }
         PyObject *res = lsi->ls->xs->ob_item[lsi->i];
         Py_INCREF(res);
         (lsi->i)++;
@@ -1385,6 +1444,9 @@ LS_init(LSObject *self, PyObject *args, PyObject *kw)
 
     if (reverse)
         self->reverse = 1;
+
+    if (keyfunc == Py_None)
+        keyfunc = NULL;
 
     if (keyfunc != NULL) {
         if (!PyCallable_Check(keyfunc)) {

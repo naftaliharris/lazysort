@@ -290,6 +290,11 @@ class TestLazySorted(unittest.TestCase):
         # You can't call LazySorted without arguments
         self.assertRaises(TypeError, lambda: LazySorted())
 
+        # You can't use a key with the wrong number of arguments
+        for key in [lambda: "foo", lambda x, y: x + y]:
+            self.assertRaises(TypeError, lambda: LazySorted(xs, key=key)[3])
+            self.assertRaises(TypeError, lambda: LazySorted(xs, key=key)[3])
+
 
 if __name__ == "__main__":
     unittest.main()

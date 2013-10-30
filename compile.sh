@@ -6,7 +6,7 @@ rm -rf build
 for version in 2.5 2.6 2.7
 do
 echo -e "\n\nPYTHON $version\n==========\n"
-python$version setup.py build
+CFLAGS="-UNDEBUG" python$version setup.py build
 if [ $? -ne 0 ]
 then
     exit 1
@@ -25,7 +25,7 @@ done
 for version in 3.1 3.2 3.3
 do
 echo -e "\n\nPYTHON $version\n==========\n"
-python$version setup.py build
+CFLAGS="-UNDEBUG" python$version setup.py build
 if [ $? -ne 0 ]
 then
     mv test.py.bak test.py

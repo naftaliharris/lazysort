@@ -1,11 +1,8 @@
 lazysorted
 ==========
 
-NOTE: This README is not necessarily accurate. In some places, it reflects the
-goals of this project, and not the actual state of it. To be fixed shortly.
-
 lazysorted is a Python extension module for sorting sequences lazily. It
-implements the same interface  as the builtin sorted(.) function. Since it only
+implements the same interface as the builtin sorted(.) function. Since it only
 sorts as much as necessary, it can be faster than using the builtin sorted(.)
 for tasks that do not require the entire data to be sorted, like:
 
@@ -17,7 +14,8 @@ for tasks that do not require the entire data to be sorted, like:
 How to use it
 -------------
 
-You can use LazySorted much the same way you use the sorted(.) function:
+You can use LazySorted much the same way you use python lists and the sorted(.)
+function:
 
 ```python
 >>> import random
