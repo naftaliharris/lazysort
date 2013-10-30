@@ -113,20 +113,39 @@ it's supposed to. You can test it yourself (after installing it) with
 Blah blah benchmarks
 
 
-Example
--------
+Example Uses
+------------
 
 ```python
+from lazysorted import LazySorted
+from math import floor, ceil
+
 def median(xs):
     """An expected linear time median function"""
-    n = len(xs)
+    ls = LazySorted(xs)
+    n = len(ls)
     if n == 0:
-        raise ValueError("Need a non-empty list")
+        raise ValueError("Need a non-empty iterable")
     elif n % 2 == 1:
-        return LazySorted(xs)[n//2]
+        return ls[n//2]
     else:
-        return sum(LazySorted(xs)[(n/2-1):(n/2+1)]) / 2.0
+        return sum(ls[(n/2-1):(n/2+1)]) / 2.0
 
+
+def trimmed_mean(xs, alpha=0.05):
+    """Computes the mean of the xs from the alpha to (1-alpha) percentiles
+    in expected linear time. More robust than the ordinary sample mean."""
+    if not 0 <= alpha < 0.5:
+        raise ValueError("alpha must be in [0, 0.5)")
+
+    ls = LazySorted(xs)
+    n = len(ls)
+    if n == 0:
+        raise ValueError("Need a non-empty iterable")
+    lower = int(floor(n * alpha))
+    upper = int(ceil(n * (1 - alpha)))
+    return sum(ls.between(lower, upper)) / (upper - lower)
+    
 ```
 
 FAQ
@@ -138,13 +157,19 @@ Yes, but it's implemented by sorting the entire array and then reading off the
 requested values, not with quickselect or another O(n) selection algorithm.
 And LazySorted is empirically faster, as you can see from benchmark.py
 
+**Isn't python3.4 going to have a statistics module with a median function?**
+
+Yes, and that's awesome! (This is PEP450: http://www.python.org/dev/peps/pep-0450/).
+Unfortunately, the current implementation is in pure python, and computes the
+median by sorting the data and picking off the middle element.
+
 **Doesn't the standard library have a heapq module?**
 
 Yes, but it lacks the full generality of this module. For example, you can use
 it to get the k smallest elements, (in n * log(k) time), but not k arbitrary
 contiguous elements. This module represents a different paradigm: you're
-allowed to program as if your list was sorted, and let the module deal with the
-details.
+allowed to program as if your list was sorted, and let the datastructure deal
+with the details.
 
 **How is lazysorted licensed?**
 
@@ -156,13 +181,13 @@ See LICENSE for details.
 1. Applications requiring a stable sort; the quicksort partitions make the
    order of equal elements in the sorted list undefined.
 2. Applications requiring guaranteed fast worst-case performance. Although
-   it's very unlikely, all operations in LazySorted run in worst case O(n^2)
+   it's very unlikely, many operations in LazySorted run in worst case O(n^2)
    time.
 3. Applications requiring high security. The random number generator is
    insecure and seeded from system time, so an (ambitious) attacker could
    reverse engineer the random number generator and feed LazySorted
    pathological lists that make it run in O(n^2) time.
-4. Sorting entire lists: The builtin sorted(.) is very impressively designed
+4. Sorting entire lists: The builtin sorted(.) is *very* impressively designed
    and implemented. It also has the advantage of running faster than nlog(n)
    on lists with partial structure.
 
