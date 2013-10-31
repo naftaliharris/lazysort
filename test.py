@@ -297,7 +297,7 @@ class TestLazySorted(unittest.TestCase):
 
     def test_new_init(self):
         """Calling just __new__ should give you a working LazySorted object"""
-        ls = LazySorted.__new__(LazySorted)
+        ls = LazySorted.__new__(LazySorted, [])
         self.assertRaises(IndexError, lambda: ls[4])
         self.assertRaises(TypeError, lambda: ls["foo"])
         self.assertRaises(ValueError, lambda: ls.index(4))

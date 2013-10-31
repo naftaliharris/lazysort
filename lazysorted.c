@@ -488,21 +488,60 @@ free_tree(PivotNode *root)
 static PyObject *
 newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    /* TODO: Be careful about Py_DECREFing stuff on error */
+
     LSObject *self;
+    PyObject *sequence = NULL;
+    PyObject *keyfunc = NULL;
+    int reverse = 0;
+    static char *kwdlist[] = {"sequence", "key", "reverse", 0};
+
     self = (LSObject *)type->tp_alloc(type, 0);
     if (self == NULL)
         return NULL;
-
     self->root = NULL;
+    self->keyfunc = NULL;
+    self->reverse = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Oi:LazySorted",
+        kwdlist, &sequence, &keyfunc, &reverse))
+        return NULL;
+
+    PyObject *list_args = Py_BuildValue("(O)", sequence);
+    if (list_args == NULL)
+        return NULL;
+
+    PyObject *list_kwds = Py_BuildValue("{}");
+    if (list_kwds == NULL)
+        return NULL;
+
+    self->xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, list_args, list_kwds);
+    if (self->xs == NULL)
+        return NULL;
+    if (PyList_Type.tp_init((PyObject *)self->xs, list_args, list_kwds))
+        return NULL;
+
+    if (reverse)
+        self->reverse = 1;
+
+    if (keyfunc == Py_None)
+        keyfunc = NULL;
+
+    if (keyfunc != NULL) {
+        if (!PyCallable_Check(keyfunc)) {
+            /* TODO: Mimic whatever error message you get from sorted */
+            PyErr_SetString(PyExc_TypeError, "key must be callable");
+            return NULL;
+        }
+        self->keyfunc = keyfunc;
+    }
+
     if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
         return NULL;
 
-    self->xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, args, kwds);
-    if (self->xs == NULL)
+    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
+            NULL)
         return NULL;
-
-    self->keyfunc = NULL;
-    self->reverse = 0;
 
     return (PyObject *)self;
 }
@@ -1420,51 +1459,6 @@ static PyMappingMethods ls_as_mapping = {
     NULL,
 };
 
-static int
-LS_init(LSObject *self, PyObject *args, PyObject *kw)
-{
-    PyObject *sequence = NULL;
-    PyObject *keyfunc = NULL;
-    int reverse = 0;
-    static char *kwlist[] = {"sequence", "key", "reverse", 0};
-
-    if (!PyArg_ParseTupleAndKeywords(args, kw, "O|Oi:list",
-        kwlist, &sequence, &keyfunc, &reverse))
-        return -1;
-
-    PyObject *list_args = Py_BuildValue("(O)", sequence);
-    if (list_args == NULL)
-        return -1;
-
-    PyObject *list_kws = Py_BuildValue("{}");
-    if (list_kws == NULL)
-        return -1;
-
-    if (PyList_Type.tp_init((PyObject *)self->xs, list_args, list_kws))
-        return -1;
-
-    if (reverse)
-        self->reverse = 1;
-
-    if (keyfunc == Py_None)
-        keyfunc = NULL;
-
-    if (keyfunc != NULL) {
-        if (!PyCallable_Check(keyfunc)) {
-            /* TODO: Mimic whatever error message you get from sorted */
-            PyErr_SetString(PyExc_TypeError, "key must be callable");
-            return -1;
-        }
-        self->keyfunc = keyfunc;
-    }
-
-    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
-            NULL)
-        return -1;
-
-    return 0;
-}
-
 static PyTypeObject LS_Type = {
     /* The ob_type field must be initialized in the module init function
      * to be portable to Windows without using C++. */
@@ -1505,7 +1499,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_descr_get*/
     0,                      /*tp_descr_set*/
     0,                      /*tp_dictoffset*/
-    (initproc)LS_init,      /*tp_init*/
+    0,                      /*tp_init*/
     0,                      /*tp_alloc*/
     newLSObject,            /*tp_new*/
     0,                      /*tp_free*/
