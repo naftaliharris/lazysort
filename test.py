@@ -295,6 +295,20 @@ class TestLazySorted(unittest.TestCase):
             self.assertRaises(TypeError, lambda: LazySorted(xs, key=key)[3])
             self.assertRaises(TypeError, lambda: LazySorted(xs, key=key)[3])
 
+    def test_new_init(self):
+        """Calling just __new__ should give you a working LazySorted object"""
+        ls = LazySorted.__new__(LazySorted)
+        self.assertRaises(IndexError, lambda: ls[4])
+        self.assertRaises(TypeError, lambda: ls["foo"])
+        self.assertRaises(ValueError, lambda: ls.index(4))
+        self.assertRaises(ValueError, lambda: ls.index("foo"))
+        self.assertFalse("foo" in ls)
+        self.assertFalse(4 in ls)
+        self.assertEqual(ls.count("foo"), 0)
+        self.assertEqual(ls[0:5], [])
+        self.assertEqual(len(ls), 0)
+        self.assertEqual(list(ls), [])
+
 
 if __name__ == "__main__":
     unittest.main()
