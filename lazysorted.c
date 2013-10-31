@@ -534,6 +534,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
             return NULL;
         }
         self->keyfunc = keyfunc;
+        Py_INCREF(self->keyfunc);
     }
 
     if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
@@ -1288,10 +1289,8 @@ ls_length(LSObject *self)
 static void
 LS_dealloc(LSObject *self)
 {
-    if (self->keyfunc != NULL) {
-        Py_DECREF(self->keyfunc);
-    }
     Py_DECREF(self->xs);
+    Py_XDECREF(self->keyfunc);
     free_tree(self->root);
     PyObject_Del(self);
 }

@@ -3,7 +3,7 @@
 
 rm -rf build
 
-for version in 2.5 2.6 2.7
+for version in 2.7-dbg 2.5 2.6 2.7
 do
 echo -e "\n\nPYTHON $version\n==========\n"
 CFLAGS="-UNDEBUG" python$version setup.py build
@@ -12,8 +12,14 @@ then
     exit 1
 fi
 echo ""
-PYTHONPATH="build/lib.linux-x86_64-$version/" python$version -c "import lazysorted; print(lazysorted);"
-PYTHONPATH="build/lib.linux-x86_64-$version/" python$version test.py
+
+loc=$version
+if [ "$version" == "2.7-dbg" ]
+then
+    loc="2.7-pydebug"
+fi
+PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version -c "import lazysorted; print(lazysorted);"
+PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version test.py
 if [ $? -ne 0 ]
 then
     exit 1
