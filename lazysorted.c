@@ -166,7 +166,7 @@ insert_pivot(Py_ssize_t k, int flags, PivotNode **root, PivotNode *start)
         return (PivotNode *)PyErr_NoMemory();
     node->idx = k;
     node->flags = flags;
-    node->priority = rand(); /* XXX Security, thread-safety */
+    node->priority = rand();
     node->left = NULL;
     node->right = NULL;
 
@@ -485,23 +485,27 @@ free_tree(PivotNode *root)
     PyMem_Free(root);
 }
 
+static void
+LS_dealloc(LSObject *self)
+{
+    Py_DECREF(self->xs);
+    Py_XDECREF(self->keyfunc);
+    if (self->root != NULL) {
+        free_tree(self->root);
+    }
+    Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
 static PyObject *
 newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    /* TODO: Be careful about Py_DECREFing stuff on error */
-
+    /* TODO: Figure out how to dealloc upon error */
     LSObject *self;
+    PyListObject *xs;
     PyObject *sequence = NULL;
     PyObject *keyfunc = NULL;
     int reverse = 0;
     static char *kwdlist[] = {"sequence", "key", "reverse", 0};
-
-    self = (LSObject *)type->tp_alloc(type, 0);
-    if (self == NULL)
-        return NULL;
-    self->root = NULL;
-    self->keyfunc = NULL;
-    self->reverse = 0;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|Oi:LazySorted",
         kwdlist, &sequence, &keyfunc, &reverse))
@@ -511,15 +515,38 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (list_args == NULL)
         return NULL;
 
-    PyObject *list_kwds = Py_BuildValue("{}");
-    if (list_kwds == NULL)
+    xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, list_args, NULL);
+    if (xs == NULL) {
+        Py_DECREF(list_args);
         return NULL;
+    }
 
-    self->xs = (PyListObject *)PyList_Type.tp_new(&PyList_Type, list_args, list_kwds);
-    if (self->xs == NULL)
+    if (PyList_Type.tp_init((PyObject *)xs, list_args, NULL)) {
+        Py_DECREF(list_args);
+        Py_DECREF(xs);
         return NULL;
-    if (PyList_Type.tp_init((PyObject *)self->xs, list_args, list_kwds))
+    }
+    Py_DECREF(list_args);
+
+    self = (LSObject *)type->tp_alloc(type, 0);
+    if (self == NULL) {
+        Py_DECREF(xs);
         return NULL;
+    }
+    self->root = NULL;
+    self->keyfunc = NULL;
+    self->reverse = 0;
+    self->xs = xs;
+
+    if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL) {
+        /* LS_dealloc(self); */
+        return NULL;
+    }
+
+    if (insert_pivot(Py_SIZE(xs), UNSORTED, &self->root, self->root) == NULL) {
+        /* LS_dealloc(self); */
+        return NULL;
+    }
 
     if (reverse)
         self->reverse = 1;
@@ -528,21 +555,17 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
         keyfunc = NULL;
 
     if (keyfunc != NULL) {
+        /* Since we sort lazily, we wouldn't discover that the key isn't
+         * callable until we actually attempted sorting. So let's try to help
+         * the user by failing fast if this is the case. */
         if (!PyCallable_Check(keyfunc)) {
-            /* TODO: Mimic whatever error message you get from sorted */
             PyErr_SetString(PyExc_TypeError, "key must be callable");
+            /* LS_dealloc(self); */
             return NULL;
         }
         self->keyfunc = keyfunc;
         Py_INCREF(self->keyfunc);
     }
-
-    if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL)
-        return NULL;
-
-    if (insert_pivot(Py_SIZE(self->xs), UNSORTED, &self->root, self->root) ==
-            NULL)
-        return NULL;
 
     return (PyObject *)self;
 }
@@ -573,7 +596,7 @@ islt(PyObject *x, PyObject *y, LSObject *ls)
         y_cmp = PyObject_CallObject(ls->keyfunc, y_arg);
         Py_DECREF(y_arg);
         if (y_cmp == NULL) {
-            Py_DECREF(x_arg);
+            Py_DECREF(x_cmp);
             return -1;
         }
 
@@ -887,7 +910,7 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
  * calling find_item on some list with item = 1 will result in the following
  * list:
  * [0, 0, 0, 1, 2, 2, 1, 2, 1, 1, 2]
- * TODO: Would this be fixed by changing < to <= in islt?
+ * TODO: Would this be fixed by changing < to <= in islt? No, I don't think so!
  */
 static Py_ssize_t find_item(LSObject *, PyObject *)
 Py_GCC_ATTRIBUTE((warn_unused_result));
@@ -1286,16 +1309,6 @@ ls_length(LSObject *self)
     return Py_SIZE(self->xs);
 }
 
-static void
-LS_dealloc(LSObject *self)
-{
-    Py_DECREF(self->xs);
-    Py_XDECREF(self->keyfunc);
-    free_tree(self->root);
-    PyObject_Del(self);
-}
-
-
 /* The LazySorted iterator object */
 /* TODO: Be a little smarter here, (keep track of pivots, etc) */
 typedef struct {
@@ -1499,7 +1512,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_descr_set*/
     0,                      /*tp_dictoffset*/
     0,                      /*tp_init*/
-    0,                      /*tp_alloc*/
+    PyType_GenericAlloc,    /*tp_alloc*/
     newLSObject,            /*tp_new*/
     0,                      /*tp_free*/
     0,                      /*tp_is_gc*/
@@ -1519,7 +1532,7 @@ PyDoc_STRVAR(module_doc,
 PyMODINIT_FUNC
 PyInit_lazysorted(void)
 {
-    srand(time(NULL)); /* XXX Worry about security, thread-safety etc */
+    srand(time(NULL));
 
     PyObject *m;
 
@@ -1552,7 +1565,7 @@ PyInit_lazysorted(void)
 PyMODINIT_FUNC
 initlazysorted(void)
 {
-    srand(time(NULL)); /* XXX Worry about security, thread-safety etc */
+    srand(time(NULL));
 
     PyObject *m;
 
