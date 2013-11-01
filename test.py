@@ -309,6 +309,11 @@ class TestLazySorted(unittest.TestCase):
         self.assertEqual(len(ls), 0)
         self.assertEqual(list(ls), [])
 
+    def test_subclassing(self):
+        """LazySorted should be subclassable"""
+        class MyLS(LazySorted):
+            pass
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,6 @@
 #define PyString_FromString PyUnicode_FromString
 #define PyString_Format PyUnicode_Format
 #define PyInt_FromSsize_t PyLong_FromSsize_t
-#define Py_TPFLAGS_HAVE_ITER 0
 #endif
 
 #if PY_VERSION_HEX < 0x03020000
@@ -1494,7 +1493,7 @@ static PyTypeObject LS_Type = {
     0,                      /*tp_setattro*/
     0,                      /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT |
-    Py_TPFLAGS_HAVE_ITER,   /*tp_flags*/
+    Py_TPFLAGS_BASETYPE,    /*tp_flags*/
     0,                      /*tp_doc*/
     0,                      /*tp_traverse*/
     0,                      /*tp_clear*/
