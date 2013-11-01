@@ -786,7 +786,6 @@ sort_point(LSObject *ls, Py_ssize_t k)
     while (left->idx + 1 + SORT_THRESH <= right->idx) {
         piv_idx = partition(ls, left->idx + 1, right->idx);
         if (piv_idx < 0) {
-            /* TODO: Cleanup? */
             return -1;
         }
         if (piv_idx < k) {
@@ -831,7 +830,6 @@ sort_point(LSObject *ls, Py_ssize_t k)
     }
 
     if (insertion_sort(ls, left->idx + 1, right->idx) < 0) {
-        /* TODO: Cleanup? */
         return -1;
     }
     left->flags |= SORTED_LEFT;
@@ -879,7 +877,6 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
             /* Since we are sorting the entire region, we don't need to keep
              * track of pivots, and so we can use vanilla quicksort */
             if (quick_sort(ls, current->idx + 1, next->idx) < 0) {
-                /* TODO: Do we need to cleanup or anything? */
                 return -1;    
             }
             current->flags |= SORTED_LEFT;
@@ -908,7 +905,6 @@ sort_range(LSObject *ls, Py_ssize_t start, Py_ssize_t stop)
  * calling find_item on some list with item = 1 will result in the following
  * list:
  * [0, 0, 0, 1, 2, 2, 1, 2, 1, 1, 2]
- * TODO: Would this be fixed by changing < to <= in islt? No, I don't think so!
  */
 static Py_ssize_t find_item(LSObject *, PyObject *)
 Py_GCC_ATTRIBUTE((warn_unused_result));
@@ -954,7 +950,6 @@ find_item(LSObject *ls, PyObject *item)
         Py_ssize_t piv_idx;
         while (left->idx + 1 + SORT_THRESH <= right->idx) {
             if ((piv_idx = partition(ls, left->idx + 1, right->idx)) < 0) {
-                /* TODO: Do we need to clean up? */
                 return -2;
             }
             IFLT(ls->xs->ob_item[piv_idx], item) {
@@ -1036,7 +1031,7 @@ ls_subscript(LSObject* self, PyObject* item)
 
         if (k < 0 || k >= xs_len) {
             if (indexerr == NULL) {
-                indexerr = PyString_FromString("list index out of range");
+                indexerr = PyString_FromString("LazySorted index out of range");
                 if (indexerr == NULL)
                     return NULL;
             }
@@ -1436,8 +1431,8 @@ static PyMethodDef LS_methods[] = {
 )},
     {"index", (PyCFunction)ls_index, METH_VARARGS,
         PyDoc_STR(
-"Returns the index of item in the list, or raises a ValueError if it isn't\n"
-"present"
+"Returns the first index of item in the list, or raises a ValueError if it\n"
+"isn't present"
 )},
     {"count", (PyCFunction)ls_count, METH_VARARGS,
         PyDoc_STR(
@@ -1522,7 +1517,15 @@ static PyMethodDef ls_methods[] = {
 };
 
 PyDoc_STRVAR(module_doc,
-"TODO: Add module docs..."
+"lazysorted is a Python extension module for sorting sequences lazily. It\n"
+"presents the programmer with the abstraction that they are actually working\n"
+"with a sorted list, when in fact the list is only physically sorted when\n"
+"the programmer requests elements from it, and even then it is only sorted\n"
+"partially just enough to return whatever was requested.\n"
+"\n"
+"The LazySorted object has a constructor that implements the same interface\n"
+"as the builtin `sorted(...)` function, and it supports most of the non-\n"
+"mutating methods of a python list.\n"
 );
 
 /* Initialization function for the module */
