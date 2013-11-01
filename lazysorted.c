@@ -499,7 +499,6 @@ LS_dealloc(LSObject *self)
 static PyObject *
 newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    /* TODO: Figure out how to dealloc upon error */
     LSObject *self;
     PyListObject *xs;
     PyObject *sequence = NULL;
@@ -539,12 +538,12 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->xs = xs;
 
     if (insert_pivot(-1, UNSORTED, &self->root, self->root) == NULL) {
-        /* LS_dealloc(self); */
+        Py_DECREF(self);
         return NULL;
     }
 
     if (insert_pivot(Py_SIZE(xs), UNSORTED, &self->root, self->root) == NULL) {
-        /* LS_dealloc(self); */
+        Py_DECREF(self);
         return NULL;
     }
 
@@ -560,7 +559,7 @@ newLSObject(PyTypeObject *type, PyObject *args, PyObject *kwds)
          * the user by failing fast if this is the case. */
         if (!PyCallable_Check(keyfunc)) {
             PyErr_SetString(PyExc_TypeError, "key must be callable");
-            /* LS_dealloc(self); */
+            Py_DECREF(self);
             return NULL;
         }
         self->keyfunc = keyfunc;
