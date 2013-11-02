@@ -1,6 +1,8 @@
 #!/bin/bash
 # Script for testing on different python versions
 
+pandoc --from=markdown --to=rst --output=README.rst README.md
+
 function restore {
     if [ -f test.py.bak ]
     then

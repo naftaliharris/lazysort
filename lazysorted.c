@@ -1014,7 +1014,7 @@ fail:
 
 /* Public facing LazySorted methods */
 
-static PyObject *indexerr = NULL;
+static PyObject *idxerr = NULL;
 
 static PyObject *
 ls_subscript(LSObject* self, PyObject* item)
@@ -1030,12 +1030,12 @@ ls_subscript(LSObject* self, PyObject* item)
             k += xs_len;
 
         if (k < 0 || k >= xs_len) {
-            if (indexerr == NULL) {
-                indexerr = PyString_FromString("LazySorted index out of range");
-                if (indexerr == NULL)
+            if (idxerr == NULL) {
+                idxerr = PyString_FromString("LazySorted index out of range");
+                if (idxerr == NULL)
                     return NULL;
             }
-            PyErr_SetObject(PyExc_IndexError, indexerr);
+            PyErr_SetObject(PyExc_IndexError, idxerr);
             return NULL;
         }
 
