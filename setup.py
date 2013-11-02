@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 module1 = Extension('lazysorted', sources=['lazysorted.c'])
 
-f = open("README.rst")
+f = open("README.txt")
 readme = f.read()
 f.close()
 
@@ -12,7 +12,6 @@ setup(name='lazysorted',
       author='Naftali Harris',
       author_email='naftaliharris@gmail.com',
       url='www.naftaliharris.com',
-      packages=['.'],
       keywords=["sort", "sorting", "partial", "lazy", "list"],
       classifiers=[
           "Development Status :: 4 - Beta",
