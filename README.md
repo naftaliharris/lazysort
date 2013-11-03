@@ -183,6 +183,16 @@ Then you can install lazysorted with
 
     $ sudo python setup.py install
 
+Alternatively, you can install lazysorted from pypi with
+
+    $ easy_install --user lazysorted
+
+or
+    
+    $ pip install lazysorted
+
+though you'll still need the python headers for it to build properly.
+
 
 Testing
 -------
@@ -233,9 +243,9 @@ See LICENSE for details.
     insecure and seeded from system time, so an (ambitious) attacker could
     reverse engineer the random number generator and feed LazySorted
     pathological lists that make it run in O(n^2) time.
-4.  Sorting entire lists: The builtin sorted(.) is *very* impressively designed
-    and implemented. It also has the advantage of running faster than O(n log n)
-    on lists with partial structure.
+4.  Sorting entire lists: The builtin `sorted(...)` is *very* impressively
+    designed and implemented. It also has the advantage of running faster than
+    O(n log n) on lists with partial structure.
 
 **How does lazysorted work at scale?**
 
