@@ -42,6 +42,11 @@
 #define Py_TYPE(ob)             (((PyObject*)(ob))->ob_type)
 #endif
 
+/* Macros to support different compilers */
+#if !(defined(__GNUC__) || defined(__clang__))
+#define __builtin_prefetch(x)
+#endif
+
 /* Definitions and functions for the binary search tree of pivot points.
  * The BST implementation is a Treap, selected because of its general speed,
  * especially when inserting and removing elements, which happens a lot in this
@@ -709,6 +714,7 @@ partition(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 
     Py_ssize_t i;
     for (i = left + 1; i < right; i++) {
+        __builtin_prefetch(ob_item[i+3]);
         IFLT(ob_item[i], pivot) {
             last_less++;
             SWAP(i, last_less);
