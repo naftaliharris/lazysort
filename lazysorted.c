@@ -714,6 +714,11 @@ partition(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
 
     Py_ssize_t i;
     for (i = left + 1; i < right; i++) {
+        /*
+        This single line boosts performance by a factor of around 2 on GCC.
+        The optimal lookahead distance i+3 was chosen by experimentation.
+        See http://www.naftaliharris.com/blog/2x-speedup-with-one-line-of-code/
+        */
         __builtin_prefetch(ob_item[i+3]);
         IFLT(ob_item[i], pivot) {
             last_less++;
