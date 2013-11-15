@@ -149,7 +149,7 @@ partition sublist(s) as necessary and recurse into the side(s) that our data is
 in.
 
 There are also some implementation details that help lazysorted to run quickly:
-First of all, pivots elements are chosen to be the median of three randomly
+First of all, pivots elements are chosen to be the median of three randomly selected
 elements, which makes the partition likely to be more balanced and guarantees
 average case O(n log n) behavior.
 
