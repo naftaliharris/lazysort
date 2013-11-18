@@ -6,7 +6,7 @@
 /* Parameters for the sorting function */
 
 /* SORT_THRESH: Sort if the sublist has SORT_THRESH or fewer elements */
-#define SORT_THRESH 16
+#define SORT_THRESH 16   /* Should be at least three because of prefetch */
 
 /* CONTIG_THRESH: When computing slices with integer step sizes, sort all data
  * between start and stop and then populate the list with it if 
@@ -713,13 +713,20 @@ partition(LSObject *ls, Py_ssize_t left, Py_ssize_t right)
      * pivot or the pivot itself */
 
     Py_ssize_t i;
-    for (i = left + 1; i < right; i++) {
+    for (i = left + 1; i < right - 3; i++) {
         /*
         This single line boosts performance by a factor of around 2 on GCC.
         The optimal lookahead distance i+3 was chosen by experimentation.
         See http://www.naftaliharris.com/blog/2x-speedup-with-one-line-of-code/
         */
         __builtin_prefetch(ob_item[i+3]);
+        IFLT(ob_item[i], pivot) {
+            last_less++;
+            SWAP(i, last_less);
+        }
+    }
+    assert(right - left >= 3);  /* partition isn't called on small lists */
+    for (i = right - 3; i < right; i++) {
         IFLT(ob_item[i], pivot) {
             last_less++;
             SWAP(i, last_less);
