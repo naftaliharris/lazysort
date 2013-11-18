@@ -1,8 +1,6 @@
 #!/bin/bash
 # Script for testing on different python versions
 
-pandoc --from=markdown --to=rst --output=README.txt README.md
-
 function restore {
     if [ -f test.py.bak ]
     then
@@ -19,6 +17,13 @@ function check_success {
 }
 
 rm -rf build
+pandoc --from=markdown --to=rst --output=README.txt README.md
+if [ "$1" == "notest" ]
+then
+    notest=1
+else
+    notest=0
+fi
 
 for version in 2.7-dbg 2.5 2.6 2.7 3.1 3.2 3.3
 do
@@ -40,9 +45,12 @@ then
     fi
 fi
 
-PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version -c "import lazysorted; print(lazysorted);"
-PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version test.py
-check_success
+if [ $notest -eq 0 ]
+then
+    PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version -c "import lazysorted; print(lazysorted);"
+    PYTHONPATH="build/lib.linux-x86_64-$loc/" python$version test.py
+    check_success
+fi
 done
 
 restore
