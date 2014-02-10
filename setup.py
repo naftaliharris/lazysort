@@ -7,7 +7,7 @@ readme = f.read()
 f.close()
 
 setup(name='lazysorted',
-      version='0.1',
+      version='0.1.1',
       description='A partially and lazily sorted list data structure',
       author='Naftali Harris',
       author_email='naftaliharris@gmail.com',

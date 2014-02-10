@@ -25,7 +25,7 @@ else
     notest=0
 fi
 
-for version in 2.7-dbg 2.5 2.6 2.7 3.1 3.2 3.3
+for version in 2.5 2.6 2.7 3.1 3.2 3.3
 do
 echo -e "\n\nPYTHON $version\n==========\n"
 CFLAGS="-UNDEBUG" python$version setup.py build
