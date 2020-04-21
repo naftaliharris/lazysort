@@ -67,7 +67,7 @@ def trimmed_mean(xs, alpha=0.05):
 
 ```
 
-In addition to the `__len__` and `__getitem__` methods demostrated above,
+In addition to the `__len__` and `__getitem__` methods demonstrated above,
 LazySorted also supports the `__iter__`, `__contains__`, `index`, and `count`
 methods, just like a regular python list:
 
