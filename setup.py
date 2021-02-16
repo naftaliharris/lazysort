@@ -2,7 +2,7 @@ from distutils.core import setup, Extension
 
 module1 = Extension('lazysorted', sources=['lazysorted.c'])
 
-f = open("README.txt")
+f = open("README.md")
 readme = f.read()
 f.close()
 
